@@ -23,7 +23,8 @@ function el(tag, props = {}, ...kids) {
 }
 
 async function api(path, method = 'GET', body) {
-  const r = await fetch('/api/' + path, {
+  // Relative on purpose (like every address on the site): it also works under /jawbreakers/
+  const r = await fetch('api/' + path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined
@@ -72,14 +73,14 @@ function eventCard(ev) {
 }
 
 (function buildChrome() {
-  const here = location.pathname.replace(/^\/$/, '/index.html');
+  const here = location.pathname.split('/').pop() || 'index.html';
   const links = [
-    ['/index.html', 'Home'], ['/members.html', 'Guild members'], ['/events.html', 'Events'],
-    ['/about.html', 'About'], ['/admin.html', 'Admin']
+    ['index.html', 'Home'], ['members.html', 'Guild members'], ['events.html', 'Events'],
+    ['about.html', 'About'], ['admin.html', 'Admin']
   ];
   document.body.prepend(el('header', { class: 'site-header' },
     el('div', { class: 'inner' },
-      el('a', { class: 'brand', href: '/' }, 'Jaw', el('span', { text: 'breakers' })),
+      el('a', { class: 'brand', href: './' }, 'Jaw', el('span', { text: 'breakers' })),
       el('nav', { class: 'nav', 'aria-label': 'Main' },
         links.map(([href, text]) => el('a', { href, text, class: href === here && 'current', 'aria-current': href === here && 'page' }))))));
   document.body.append(el('footer', { class: 'site-footer', text: 'Jawbreakers · Horde · EU · PvP · For the Horde!' }));

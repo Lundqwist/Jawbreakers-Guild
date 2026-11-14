@@ -27,5 +27,8 @@ The database is created in `data/` on first start, and the member lists are fill
 
 ## Deploy
 
+Live at https://lundqwist.se/jawbreakers/. The lundqwist.se site (github.com/Lundqwist/Website2.0) passes `/jawbreakers/...` on to this one,
+which runs with `PathBase=/jawbreakers`. All addresses in `wwwroot` are relative so the pages work both there and at the root locally.
+
 `.\deploy.ps1` publishes to `Z:\jawbreakers\app` on the NAS; `deploy\docker-compose.yml` runs it there on `127.0.0.1:8095`.
 The admin password goes in a `.env` file next to the compose file (see `deploy\.env.example`).

@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jawbreakers · Horde guild, EU PvP</title>
-  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="css/site.css">
 </head>
 <body>
   <div class="hero">
-    <img src="/img/hero.webp" width="768" height="435" alt="Jawbreakers, for the Horde: five Horde warriors in front of a fortress hung with red banners">
+    <img src="img/hero.webp" width="768" height="435" alt="Jawbreakers, for the Horde: five Horde warriors in front of a fortress hung with red banners">
   </div>
   <main>
     <div class="tagline">
@@ -22,13 +22,13 @@
     </section>
 
     <div class="cards">
-      <a class="card" href="/members.html"><h2>Guild members</h2><p>Our characters, class by class, with links to the Armory.</p></a>
-      <a class="card" href="/events.html"><h2>Events</h2><p>Raids, world PvP and everything else on the calendar.</p></a>
-      <a class="card" href="/about.html"><h2>About</h2><p>Who we are and what we have achieved so far.</p></a>
+      <a class="card" href="members.html"><h2>Guild members</h2><p>Our characters, class by class, with links to the Armory.</p></a>
+      <a class="card" href="events.html"><h2>Events</h2><p>Raids, world PvP and everything else on the calendar.</p></a>
+      <a class="card" href="about.html"><h2>About</h2><p>Who we are and what we have achieved so far.</p></a>
     </div>
   </main>
 
-  <script src="/js/common.js"></script>
+  <script src="js/common.js"></script>
   <script>
     api('events').then(events => {
       const next = events.find(e => new Date(e.startsAt) >= new Date());

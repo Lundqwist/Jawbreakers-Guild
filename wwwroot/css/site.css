@@ -191,7 +191,7 @@ details.past .panel { opacity: .75; }
 .about-image {
   width: 100%;
   aspect-ratio: 4 / 5;
-  background: url(/img/hero.webp) 47% 100% / auto 175% no-repeat;
+  background: url(../img/hero.webp) 47% 100% / auto 175% no-repeat;
   border: 1px solid var(--line);
   border-radius: 4px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, .45);

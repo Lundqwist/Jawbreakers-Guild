@@ -12,7 +12,7 @@ services:
     image: mcr.microsoft.com/dotnet/aspnet:8.0
     container_name: jawbreakers
     restart: unless-stopped
-    # The NAS's own network: DSM's reverse proxy reaches the site at localhost:8095
+    # The NAS's own network: the lundqwist.se site reaches this one at localhost:8095
     network_mode: host
     working_dir: /app
     command: ["dotnet", "Jawbreakers.dll"]
@@ -20,6 +20,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       # Listen only on the NAS itself; visitors come in through the reverse proxy (HTTPS)
       - ASPNETCORE_URLS=http://127.0.0.1:8095
+      # The site lives at https://lundqwist.se/jawbreakers/ (lundqwist.se passes those requests on)
+      - PathBase=/jawbreakers
       - DataDir=/data
       # The admin page's password, read from the .env file. Empty = admin sign-in is off.
       - Admin__Password=${ADMIN_PASSWORD:-}

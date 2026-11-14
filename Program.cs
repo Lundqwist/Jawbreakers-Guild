@@ -20,6 +20,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     o.Cookie.Name = "jawbreakers_admin";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Strict;
+    // The live site is always https, even though the proxies in front hand the request over as http
+    if (!builder.Environment.IsDevelopment()) o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     o.ExpireTimeSpan = TimeSpan.FromDays(14);
     o.SlidingExpiration = true;
     o.Events.OnRedirectToLogin = c => { c.Response.StatusCode = 401; return Task.CompletedTask; };
@@ -86,6 +88,23 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
 });
+
+// The live site is at https://lundqwist.se/jawbreakers/ (PathBase=/jawbreakers); locally it runs at the root.
+// Pages use relative addresses, so they need the trailing slash: /jawbreakers -> /jawbreakers/
+var pathBase = app.Configuration["PathBase"];
+if (!string.IsNullOrEmpty(pathBase))
+{
+    app.UsePathBase(pathBase);
+    app.Use(async (http, next) =>
+    {
+        if (http.Request.PathBase.HasValue && !http.Request.Path.HasValue)
+            http.Response.Redirect(http.Request.PathBase + "/" + http.Request.QueryString);
+        else if (!http.Request.PathBase.HasValue)
+            http.Response.StatusCode = 404; // only answers under its own address
+        else
+            await next();
+    });
+}
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
