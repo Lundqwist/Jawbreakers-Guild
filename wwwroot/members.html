@@ -16,11 +16,14 @@
 
   <script src="js/common.js"></script>
   <script>
-    let isAdmin = false;
+    let isAdmin = false, skills = [];
 
     function detailPanel(c) {
       const text = el('p', { text: c.description || 'No description yet.', class: !c.description && 'muted' });
       const panel = el('div', { class: 'char-detail', id: `detail-${c.id}`, hidden: true }, text);
+      const mine = skills.filter(s => s.characterId === c.id).sort((a, b) => b.skill - a.skill);
+      if (mine.length) panel.append(el('p', { class: 'muted' }, 'Professions: ',
+        mine.flatMap((s, i) => [i > 0 && ', ', el('a', { href: `crafting.html#${s.profession.toLowerCase().replace(/[^a-z]+/g, '-')}`, text: s.profession }), ` ${s.skill}`])));
       if (c.armoryUrl) panel.append(el('p', {}, el('a', { href: c.armoryUrl, target: '_blank', rel: 'noopener', text: `${c.name} on the Armory` })));
       if (isAdmin) {
         const box = el('textarea', { maxlength: 2000, 'aria-label': `Description of ${c.name}` });
@@ -54,8 +57,9 @@
         panel);
     }
 
-    Promise.all([metaPromise, api('characters')]).then(([meta, characters]) => {
+    Promise.all([metaPromise, api('characters'), api('crafting')]).then(([meta, characters, crafting]) => {
       isAdmin = meta.admin;
+      skills = crafting.skills;
       const grid = document.getElementById('classes');
       for (const cls of meta.classes) {
         const mine = characters.filter(c => c.class === cls);

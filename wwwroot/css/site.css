@@ -184,6 +184,57 @@ details.past { margin-top: 2rem; }
 details.past summary { cursor: pointer; color: var(--muted); margin-bottom: 1rem; }
 details.past .panel { opacity: .75; }
 
+/* ---- Crafting ---- */
+.prof-nav { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.25rem; }
+.prof-nav a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .15rem .8rem;
+  font-size: .9rem;
+  text-decoration: none;
+  background: var(--panel);
+}
+.prof-nav a:hover { border-color: var(--ember); }
+.profession { scroll-margin-top: 5rem; }
+.profession > header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.profession > header h2 { margin: 0; }
+a.btn { text-decoration: none; display: inline-block; }
+a.btn:hover { color: #fff; }
+.crafters { display: flex; flex-wrap: wrap; gap: .35rem; }
+.crafter {
+  display: inline-flex;
+  gap: .4rem;
+  align-items: baseline;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: .05rem .5rem;
+  font-size: .9rem;
+  text-decoration: none;
+  background: rgba(0, 0, 0, .25);
+}
+a.crafter:hover { border-color: var(--ember); }
+.crafter .name { color: var(--class, var(--text)); font-weight: 600; }
+.crafter .skill { color: var(--muted); font-size: .8rem; }
+.small { font-size: .8rem; }
+.recipes { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .75rem; }
+.recipes summary { cursor: pointer; color: var(--gold); font-family: Georgia, serif; letter-spacing: .06em; text-transform: uppercase; font-size: .9rem; }
+.recipe-tools { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; margin: .75rem 0; }
+.recipe-tools input[type=text] { width: auto; flex: 1 1 14rem; max-width: 22rem; margin: 0; }
+.recipe-head, .recipe { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: .25rem 1rem; }
+.recipe-head { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
+.recipe-list { list-style: none; margin: 0; padding: 0; }
+.recipe { padding: .5rem 0; border-bottom: 1px solid rgba(74, 42, 31, .6); align-items: start; }
+.recipe a { text-decoration: none; }
+.recipe a:hover { text-decoration: underline; }
+.recipe .what > a { font-weight: 600; }
+.wow-icon { width: 18px; height: 18px; border-radius: 3px; border: 1px solid #000; vertical-align: -4px; margin-right: .35rem; }
+.mats { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .1rem .9rem; font-size: .9rem; }
+.mats li { white-space: nowrap; }
+.who .btn { margin-top: .35rem; }
+.who form .check { font-size: .9rem; }
+.crafting-note { font-size: .85rem; margin-top: 1.5rem; }
+.prof-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .5rem .75rem; }
+
 /* ---- About ---- */
 .about { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; align-items: start; }
 .about-text p { white-space: pre-wrap; }
@@ -273,4 +324,6 @@ legend { color: var(--muted); font-size: .85rem; padding: 0 .4rem; }
   .event .when { flex: none; display: flex; gap: .6rem; align-items: baseline; padding: .4rem .8rem; }
   .event .when .time { margin: 0; }
   .nav { margin-left: 0; }
+  .recipe-head { display: none; }
+  .recipe { grid-template-columns: 1fr; }
 }

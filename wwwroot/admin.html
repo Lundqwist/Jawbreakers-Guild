@@ -61,6 +61,10 @@
           </div>
           <label style="margin-bottom:.75rem">Armory link <input type="url" name="armoryUrl" maxlength="300" placeholder="https://"></label>
           <label style="margin-bottom:.75rem">Description <textarea name="description" maxlength="2000"></textarea></label>
+          <fieldset>
+            <legend>Professions: skill level (leave empty if the character doesn't have it)</legend>
+            <div id="prof-inputs" class="prof-inputs"></div>
+          </fieldset>
           <div class="actions">
             <button class="btn" id="char-submit">Add character</button>
             <button class="btn quiet" type="button" id="char-cancel" hidden>Cancel</button>
@@ -208,6 +212,8 @@
     function editChar(c) {
       editingChar = c.id;
       for (const k of ['name', 'class', 'race', 'level', 'armoryUrl', 'description']) charForm[k].value = c[k];
+      for (const box of profInputs())
+        box.value = charSkills.find(s => s.characterId === c.id && s.profession === box.dataset.profession)?.skill || '';
       $('char-heading').textContent = 'Edit character';
       $('char-submit').textContent = 'Save character';
       $('char-cancel').hidden = false;
@@ -215,8 +221,12 @@
       charForm.scrollIntoView({ block: 'center' });
     }
 
+    let charSkills = [];
+    const profInputs = () => [...document.querySelectorAll('#prof-inputs input')];
+
     async function loadChars() {
       const chars = await api('characters');
+      charSkills = (await api('crafting')).skills;
       chars.sort((a, b) => a.name.localeCompare(b.name));
       $('char-list').replaceChildren(...chars.map(c =>
         listItem(`${c.name} · level ${c.level} ${c.race} ${c.class}`.replace(/\s+/g, ' '), [
@@ -236,7 +246,8 @@
       e.preventDefault();
       const body = {
         name: charForm.name.value, class: charForm.class.value, race: charForm.race.value,
-        level: Number(charForm.level.value), armoryUrl: charForm.armoryUrl.value, description: charForm.description.value
+        level: Number(charForm.level.value), armoryUrl: charForm.armoryUrl.value, description: charForm.description.value,
+        professions: profInputs().map(box => ({ name: box.dataset.profession, skill: Number(box.value) || 0 }))
       };
       const wasEditing = editingChar;
       await attempt('char-msg', wasEditing ? 'Character saved.' : 'Character added.', async () => {
@@ -291,6 +302,8 @@
       $('admin').hidden = false;
       charForm.class.append(...meta.classes.map(c => el('option', { text: c })));
       charForm.race.append(...meta.races.map(r => el('option', { text: r })));
+      $('prof-inputs').append(...meta.professions.map(p =>
+        el('label', {}, p.name, el('input', { type: 'number', min: 1, max: 300, 'data-profession': p.name }))));
       $('req-others').append(...meta.requirements.map(r =>
         el('label', { class: 'check' }, el('input', { type: 'checkbox', value: r }), r)));
       loadEvents(); loadChars(); loadAbout();

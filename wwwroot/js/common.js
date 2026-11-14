@@ -76,7 +76,7 @@ function eventCard(ev) {
   const here = location.pathname.split('/').pop() || 'index.html';
   const links = [
     ['index.html', 'Home'], ['members.html', 'Guild members'], ['events.html', 'Events'],
-    ['about.html', 'About'], ['admin.html', 'Admin']
+    ['crafting.html', 'Crafting'], ['about.html', 'About'], ['admin.html', 'Admin']
   ];
   document.body.prepend(el('header', { class: 'site-header' },
     el('div', { class: 'inner' },

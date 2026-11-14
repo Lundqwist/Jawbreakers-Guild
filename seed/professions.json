@@ -1,0 +1,19 @@
+[
+  { "name": "Zig Hale", "professions": { "Mining": 40, "Blacksmithing": 77, "Cooking": 12, "Fishing": 41, "First Aid": 112 } },
+  { "name": "Zulash Spinelord", "professions": { "Tailoring": 126, "Enchanting": 151, "Cooking": 150, "Fishing": 136, "First Aid": 77 } },
+  { "name": "Noprayer Schzz", "professions": { "Alchemy": 100, "Herbalism": 123, "Cooking": 4, "Fishing": 31 } },
+  { "name": "Totemi Grrowlerr", "professions": { "Mining": 191, "Engineering": 209, "Cooking": 141, "Fishing": 203, "First Aid": 228 } },
+  { "name": "Betty Beerzerker", "professions": { "Leatherworking": 125, "Skinning": 225, "Cooking": 150, "Fishing": 161, "First Aid": 225 } },
+  { "name": "Lunamal Sunshadow", "professions": { "Mining": 142, "Engineering": 175, "Cooking": 135, "Fishing": 125, "First Aid": 210 } },
+  { "name": "Tok Toki", "professions": { "Skinning": 140, "Mining": 57, "Cooking": 1, "Fishing": 10, "First Aid": 105 } },
+  { "name": "Moonbone Stellar", "professions": { "Enchanting": 152, "Blacksmithing": 150, "Cooking": 150, "Fishing": 150, "First Aid": 155 } },
+  { "name": "Fader Fudiop", "professions": { "Tailoring": 197, "Enchanting": 186, "Cooking": 1, "Fishing": 1 } },
+  { "name": "Soaring Leaf", "professions": { "Mining": 109, "Blacksmithing": 134, "Cooking": 38, "Fishing": 1, "First Aid": 5 } },
+  { "name": "Yarost Solenya", "professions": { "Mining": 103, "Engineering": 115, "Cooking": 23, "Fishing": 20, "First Aid": 67 } },
+  { "name": "Cy Rage", "professions": { "Mining": 118, "Blacksmithing": 89, "Cooking": 11, "Fishing": 1, "First Aid": 232 } },
+  { "name": "Brunsås Ministeriet", "professions": { "Leatherworking": 150, "Skinning": 190, "Cooking": 2, "First Aid": 51 } },
+  { "name": "Smouchie Totemhoof", "professions": { "Skinning": 226, "Enchanting": 154, "Cooking": 50, "Fishing": 2, "First Aid": 148 } },
+  { "name": "Im Grims", "professions": { "Leatherworking": 1, "Skinning": 75, "Cooking": 10, "First Aid": 89 } },
+  { "name": "Dhazaldur Lutobrix", "professions": { "Mining": 8, "Cooking": 1, "First Aid": 44 } },
+  { "name": "Zeon Spinelord", "professions": { "Tailoring": 76, "Enchanting": 65, "Cooking": 84, "Fishing": 55, "First Aid": 20 } }
+]

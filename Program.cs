@@ -34,6 +34,7 @@ var app = builder.Build();
 var classes = app.Configuration.GetSection("Guild:Classes").Get<string[]>() ?? [];
 var races = app.Configuration.GetSection("Guild:Races").Get<string[]>() ?? [];
 var requirements = app.Configuration.GetSection("Guild:EventRequirements").Get<string[]>() ?? [];
+var professions = app.Configuration.GetSection("Guild:Professions").Get<ProfessionInfo[]>() ?? [];
 
 // The admin password comes from configuration (environment variable Admin__Password), never from a file in the repo.
 var adminPassword = app.Configuration["Admin:Password"];
@@ -54,6 +55,13 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GuildDb>();
     db.Database.EnsureCreated();
+    // EnsureCreated does nothing for a database that already exists, so tables added later are created here.
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "CharacterProfessions" ("Id" INTEGER NOT NULL CONSTRAINT "PK_CharacterProfessions" PRIMARY KEY AUTOINCREMENT,
+            "CharacterId" INTEGER NOT NULL, "Profession" TEXT NOT NULL, "Skill" INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS "KnownRecipes" ("Id" INTEGER NOT NULL CONSTRAINT "PK_KnownRecipes" PRIMARY KEY AUTOINCREMENT,
+            "CharacterId" INTEGER NOT NULL, "Profession" TEXT NOT NULL, "SpellId" INTEGER NOT NULL);
+        """);
     if (!db.Texts.Any(t => t.Key == "about"))
     {
         db.Texts.Add(new SiteText
@@ -77,6 +85,20 @@ using (var scope = app.Services.CreateScope())
             Name = r.Name, Class = r.Class, Race = r.Race, Level = r.Level,
             ArmoryUrl = r.Slug.Length > 0 ? armory + r.Slug : ""
         }));
+        db.SaveChanges();
+    }
+
+    // Same for professions: seed/professions.json holds each character's skill levels from the Armory (2026-11-14).
+    var professionsFile = Path.Combine(app.Environment.ContentRootPath, "seed", "professions.json");
+    if (!db.CharacterProfessions.Any() && File.Exists(professionsFile))
+    {
+        var seed = System.Text.Json.JsonSerializer.Deserialize<List<ProfessionSeed>>(
+            File.ReadAllText(professionsFile), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? [];
+        var ids = db.Characters.ToDictionary(c => c.Name, c => c.Id);
+        foreach (var s in seed.Where(s => ids.ContainsKey(s.Name)))
+            db.CharacterProfessions.AddRange(s.Professions
+                .Where(p => professions.Any(x => x.Name == p.Key))
+                .Select(p => new CharacterProfession { CharacterId = ids[s.Name], Profession = p.Key, Skill = p.Value }));
         db.SaveChanges();
     }
 }
@@ -122,6 +144,7 @@ api.MapGet("/meta", (ClaimsPrincipal user) => new
     classes,
     races,
     requirements,
+    professions,
     admin = user.Identity?.IsAuthenticated == true
 });
 
@@ -172,6 +195,20 @@ string? ApplyCharacter(Character c, CharacterInput input)
     return null;
 }
 
+// Replaces the character's professions with the ones given (skill 0 = doesn't have it). Null leaves them alone.
+string? ApplyProfessions(GuildDb db, Character c, List<ProfessionInput>? input)
+{
+    if (input is null) return null;
+    var wanted = input.Where(p => p.Skill > 0).ToList();
+    if (wanted.Any(p => !professions.Any(x => x.Name == p.Name))) return "Unknown profession.";
+    if (wanted.Any(p => p.Skill > 300)) return "Profession skill is between 1 and 300.";
+    if (wanted.Select(p => p.Name).Distinct().Count() != wanted.Count) return "Each profession can only be given once.";
+    db.CharacterProfessions.RemoveRange(db.CharacterProfessions.Where(p => p.CharacterId == c.Id));
+    foreach (var p in wanted)
+        db.CharacterProfessions.Add(new CharacterProfession { CharacterId = c.Id, Profession = p.Name!, Skill = p.Skill });
+    return null;
+}
+
 static bool IsWebUrl(string url) =>
     url.Length <= 300 && Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps);
 
@@ -180,6 +217,13 @@ admin.MapPost("/characters", async (CharacterInput input, GuildDb db) =>
     var c = new Character();
     if (ApplyCharacter(c, input) is { } error) return Bad(error);
     db.Characters.Add(c);
+    await db.SaveChangesAsync(); // gives the character its id
+    if (ApplyProfessions(db, c, input.Professions) is { } professionError)
+    {
+        db.Characters.Remove(c);
+        await db.SaveChangesAsync();
+        return Bad(professionError);
+    }
     await db.SaveChangesAsync();
     return Results.Ok(c);
 });
@@ -188,7 +232,7 @@ admin.MapPut("/characters/{id:int}", async (int id, CharacterInput input, GuildD
 {
     var c = await db.Characters.FindAsync(id);
     if (c is null) return Results.NotFound();
-    if (ApplyCharacter(c, input) is { } error) return Bad(error);
+    if ((ApplyCharacter(c, input) ?? ApplyProfessions(db, c, input.Professions)) is { } error) return Bad(error);
     await db.SaveChangesAsync();
     return Results.Ok(c);
 });
@@ -207,6 +251,30 @@ admin.MapPut("/characters/{id:int}/description", async (int id, DescriptionInput
 admin.MapDelete("/characters/{id:int}", async (int id, GuildDb db) =>
 {
     await db.Characters.Where(c => c.Id == id).ExecuteDeleteAsync();
+    await db.CharacterProfessions.Where(p => p.CharacterId == id).ExecuteDeleteAsync();
+    await db.KnownRecipes.Where(k => k.CharacterId == id).ExecuteDeleteAsync();
+    return Results.NoContent();
+});
+
+// ---- Crafting ----
+
+api.MapGet("/crafting", async (GuildDb db) => new
+{
+    skills = await db.CharacterProfessions.Select(p => new { p.CharacterId, p.Profession, p.Skill }).ToListAsync(),
+    known = await db.KnownRecipes.Select(k => new { k.CharacterId, k.Profession, k.SpellId }).ToListAsync()
+});
+
+// Sets which characters know one recipe (for recipes that don't come from a trainer).
+admin.MapPut("/recipes/{spellId:int}/crafters", async (int spellId, CraftersInput input, GuildDb db) =>
+{
+    var profession = Clean(input.Profession);
+    var ids = (input.CharacterIds ?? []).Distinct().ToList();
+    if (spellId <= 0 || !professions.Any(p => p.Name == profession && p.Recipes.Length > 0)) return Bad("Unknown recipe.");
+    var allowed = await db.CharacterProfessions.Where(p => p.Profession == profession).Select(p => p.CharacterId).ToListAsync();
+    if (ids.Except(allowed).Any()) return Bad("Only characters with that profession can be ticked.");
+    await db.KnownRecipes.Where(k => k.SpellId == spellId && k.Profession == profession).ExecuteDeleteAsync();
+    db.KnownRecipes.AddRange(ids.Select(id => new KnownRecipe { CharacterId = id, Profession = profession, SpellId = spellId }));
+    await db.SaveChangesAsync();
     return Results.NoContent();
 });
 

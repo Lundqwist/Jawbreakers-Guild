@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crafting · Jawbreakers</title>
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <main>
+    <h1>Crafting</h1>
+    <p class="lead">Who in the guild has which profession, and what they can make. Open a profession's recipes and hover a recipe or a material for its tooltip.</p>
+    <nav id="prof-nav" class="prof-nav" aria-label="Professions"></nav>
+    <div id="professions"></div>
+    <p class="muted crafting-note">
+      Skill levels come from the Armory. A recipe taught by a trainer lists everyone whose skill is high enough for it.
+      A recipe that drops, is sold or comes from a quest lists a character only once the admin has ticked them.
+      Recipe data and tooltips: <a href="https://www.wowhead.com/forever" target="_blank" rel="noopener">Wowhead</a>.
+      Leveling guides: <a href="https://www.wow-professions.com/forever" target="_blank" rel="noopener">WoW-professions</a>.
+    </p>
+    <p id="error" class="msg error"></p>
+  </main>
+
+  <script src="js/common.js"></script>
+  <!-- Wowhead's tooltip script: shows a tooltip on every link to wowhead.com -->
+  <script>const whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };</script>
+  <script src="https://wow.zamimg.com/widgets/power.js" defer></script>
+  <script>
+    const WOWHEAD = 'https://www.wowhead.com/forever/';
+    const ICONS = 'https://wow.zamimg.com/images/wow/icons/small/';
+    const QUALITY = ['#9d9d9d', '#ffffff', '#1eff00', '#3d9bff', '#c069ff', '#ff8000'];
+    const SOURCES = { 2: 'drop', 4: 'quest', 5: 'vendor' };
+    let isAdmin = false, characters = new Map(), skills = [], known = [];
+
+    const slug = name => name.toLowerCase().replace(/[^a-z]+/g, '-');
+    const icon = name => name && el('img', { class: 'wow-icon', src: `${ICONS}${name}.jpg`, alt: '', loading: 'lazy', width: 18, height: 18 });
+
+    // Everyone with the profession, best first.
+    function crafters(profession) {
+      return skills.filter(s => s.profession === profession && characters.has(s.characterId))
+        .map(s => ({ ...characters.get(s.characterId), skill: s.skill }))
+        .sort((a, b) => b.skill - a.skill || a.name.localeCompare(b.name));
+    }
+
+    function characterChip(c, withSkill) {
+      const label = [el('span', { class: 'name', text: c.name }), withSkill && el('span', { class: 'skill', text: c.skill })];
+      const props = { class: 'crafter', style: `--class:${CLASS_COLORS[c.class] || 'var(--gold)'}` };
+      return c.armoryUrl
+        ? el('a', { ...props, href: c.armoryUrl, target: '_blank', rel: 'noopener', title: `${c.name} on the Armory` }, label)
+        : el('span', props, label);
+    }
+
+    // A trainer recipe (or one with no known source: the basic ones) is known once the skill is there.
+    const isTrained = r => r.src.length === 0 || r.src.includes(6);
+
+    function recipeCrafters(profession, r, all) {
+      if (isTrained(r)) return all.filter(c => c.skill >= r.skill);
+      const ids = new Set(known.filter(k => k.profession === profession && k.spellId === r.id).map(k => k.characterId));
+      return all.filter(c => ids.has(c.id));
+    }
+
+    function recipeRow(profession, data, r, all) {
+      const made = r.creates && data.items[r.creates[0]];
+      const count = r.creates && (r.creates[1] === r.creates[2] ? r.creates[1] : `${r.creates[1]}-${r.creates[2]}`);
+      const who = el('div', { class: 'who' });
+      const row = el('li', { class: 'recipe' },
+        el('div', { class: 'what' },
+          el('a', { href: `${WOWHEAD}spell=${r.id}`, target: '_blank', rel: 'noopener', style: `color:${QUALITY[made ? made[2] : 1] || '#fff'}` },
+            icon(r.icon || (made && made[1])), r.name),
+          count && count !== 1 && el('span', { class: 'muted', text: ` ×${count}` }),
+          el('div', { class: 'muted small', text: `Skill ${r.skill}` + (isTrained(r) ? '' : ' · recipe from ' + (r.src.map(s => SOURCES[s]).filter(Boolean).join(' or ') || 'the world')) })),
+        el('ul', { class: 'mats', 'aria-label': 'Materials' }, r.mats.map(([id, n]) => {
+          const item = data.items[id] || ['Item ' + id, '', 1];
+          return el('li', {}, `${n}× `, el('a', { href: `${WOWHEAD}item=${id}`, target: '_blank', rel: 'noopener', style: `color:${QUALITY[item[2]] || '#fff'}` }, icon(item[1]), item[0]));
+        })),
+        who);
+      row.dataset.name = r.name.toLowerCase();
+
+      function showWho() {
+        const list = recipeCrafters(profession, r, all);
+        row.dataset.craftable = list.length ? '1' : '';
+        who.replaceChildren(list.length ? el('div', { class: 'crafters' }, list.map(c => characterChip(c))) : el('span', { class: 'muted', text: 'Nobody yet' }));
+        if (isAdmin && !isTrained(r) && all.length) who.append(tickButton());
+      }
+
+      // Admin: tick who has learned this recipe.
+      function tickButton() {
+        return el('button', { class: 'btn quiet small', type: 'button', text: 'Set crafters', onclick: () => {
+          const ticked = new Set(recipeCrafters(profession, r, all).map(c => c.id));
+          const boxes = all.map(c => el('label', { class: 'check' }, el('input', { type: 'checkbox', value: c.id, checked: ticked.has(c.id) }), `${c.name} (${c.skill})`));
+          const msg = el('span', { class: 'msg error', role: 'alert' });
+          who.replaceChildren(el('form', { onsubmit: async e => {
+            e.preventDefault();
+            const ids = [...e.target.querySelectorAll('input:checked')].map(b => Number(b.value));
+            try {
+              await api(`recipes/${r.id}/crafters`, 'PUT', { profession, characterIds: ids });
+              known = known.filter(k => !(k.profession === profession && k.spellId === r.id))
+                .concat(ids.map(id => ({ characterId: id, profession, spellId: r.id })));
+              showWho();
+            } catch (err) { msg.textContent = err.message; }
+          } }, boxes, el('div', { class: 'actions' }, el('button', { class: 'btn small', text: 'Save' }),
+            el('button', { class: 'btn quiet small', type: 'button', text: 'Cancel', onclick: showWho }), msg)));
+        } });
+      }
+
+      showWho();
+      return row;
+    }
+
+    function recipeList(p, all) {
+      const body = el('div', { class: 'recipes-body' }, el('p', { class: 'muted', text: 'Loading recipes…' }));
+      const details = el('details', { class: 'recipes' }, el('summary', { text: 'Recipes' }), body);
+      details.addEventListener('toggle', async () => {
+        if (!details.open || details.dataset.loaded) return;
+        details.dataset.loaded = '1';
+        try {
+          const res = await fetch(`recipes/${p.recipes}.json`);
+          if (!res.ok) throw new Error(`Could not load the recipes (${res.status}).`);
+          const data = await res.json();
+          const rows = data.recipes.map(r => recipeRow(p.name, data, r, all));
+          const search = el('input', { type: 'text', placeholder: 'Search recipes', 'aria-label': `Search ${p.name} recipes` });
+          const only = el('input', { type: 'checkbox' });
+          const shown = el('span', { class: 'muted small', role: 'status' });
+          const filter = () => {
+            const q = search.value.trim().toLowerCase();
+            let n = 0;
+            for (const row of rows) {
+              row.hidden = !(row.dataset.name.includes(q) && (!only.checked || row.dataset.craftable));
+              if (!row.hidden) n++;
+            }
+            shown.textContent = `${n} of ${rows.length} recipes`;
+          };
+          search.addEventListener('input', filter);
+          only.addEventListener('change', filter);
+          body.replaceChildren(
+            el('div', { class: 'recipe-tools' }, search, el('label', { class: 'check' }, only, 'Only what the guild can make'), shown),
+            el('div', { class: 'recipe-head', 'aria-hidden': 'true' }, el('span', { text: 'Recipe' }), el('span', { text: 'Materials' }), el('span', { text: 'Crafters' })),
+            el('ul', { class: 'recipe-list' }, rows));
+          filter();
+        } catch (err) { body.replaceChildren(el('p', { class: 'msg error', text: err.message })); details.dataset.loaded = ''; }
+      });
+      return details;
+    }
+
+    function professionPanel(p) {
+      const all = crafters(p.name);
+      return el('section', { class: 'panel profession', id: slug(p.name) },
+        el('header', {},
+          el('h2', { text: p.name }),
+          el('a', { class: 'btn small', href: p.guide, target: '_blank', rel: 'noopener', text: 'Leveling guide ↗', 'aria-label': `${p.name} leveling guide on WoW-professions` })),
+        all.length
+          ? el('div', { class: 'crafters' }, all.map(c => characterChip(c, true)))
+          : el('p', { class: 'muted', text: 'Nobody in the guild has this profession yet.' }),
+        p.recipes && recipeList(p, all));
+    }
+
+    Promise.all([metaPromise, api('characters'), api('crafting')]).then(([meta, chars, crafting]) => {
+      isAdmin = meta.admin;
+      characters = new Map(chars.map(c => [c.id, c]));
+      skills = crafting.skills;
+      known = crafting.known;
+      document.getElementById('prof-nav').append(...meta.professions.map(p => el('a', { href: '#' + slug(p.name), text: p.name })));
+      document.getElementById('professions').append(...meta.professions.map(professionPanel));
+      if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+    }).catch(err => { document.getElementById('error').textContent = err.message; });
+  </script>
+</body>
+</html>
