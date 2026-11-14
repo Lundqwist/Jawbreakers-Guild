@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Admin · Jawbreakers</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <main>
+    <section id="login" class="panel" hidden style="max-width:420px;margin:2rem auto">
+      <h1>Admin</h1>
+      <form id="login-form">
+        <label>Password <input type="password" id="password" autocomplete="current-password" required></label>
+        <div class="actions" style="margin-top:.75rem">
+          <button class="btn">Sign in</button>
+          <span class="msg error" id="login-msg" role="alert"></span>
+        </div>
+      </form>
+    </section>
+
+    <div id="admin" hidden>
+      <div class="admin-head">
+        <h1>Admin</h1>
+        <button class="btn quiet" id="logout" type="button">Sign out</button>
+      </div>
+
+      <section class="panel">
+        <h2 id="event-heading">Add event</h2>
+        <form id="event-form">
+          <div class="row">
+            <label>Title <input type="text" name="title" maxlength="100" required></label>
+            <label>Date and time (realm time) <input type="datetime-local" name="startsAt" required></label>
+            <label>Starting point in game <input type="text" name="startingPoint" maxlength="100" required placeholder="Orgrimmar, front gate"></label>
+          </div>
+          <label style="margin-bottom:.75rem">Description <textarea name="description" maxlength="4000"></textarea></label>
+          <fieldset>
+            <legend>Requirements</legend>
+            <label class="check"><input type="checkbox" id="req-level"> Minimum level
+              <input type="number" id="req-level-value" min="1" max="100" disabled aria-label="Minimum level"></label>
+            <div id="req-others"></div>
+          </fieldset>
+          <div class="actions">
+            <button class="btn" id="event-submit">Add event</button>
+            <button class="btn quiet" type="button" id="event-cancel" hidden>Cancel</button>
+            <span class="msg" id="event-msg" role="status"></span>
+          </div>
+        </form>
+        <ul class="admin-list" id="event-list"></ul>
+      </section>
+
+      <section class="panel">
+        <h2 id="char-heading">Add character</h2>
+        <form id="char-form">
+          <div class="row">
+            <label>Name <input type="text" name="name" maxlength="40" required></label>
+            <label>Class <select name="class" required></select></label>
+            <label>Race <select name="race"><option value="">Not known</option></select></label>
+            <label>Level <input type="number" name="level" min="1" max="100" required></label>
+          </div>
+          <label style="margin-bottom:.75rem">Armory link <input type="url" name="armoryUrl" maxlength="300" placeholder="https://"></label>
+          <label style="margin-bottom:.75rem">Description <textarea name="description" maxlength="2000"></textarea></label>
+          <div class="actions">
+            <button class="btn" id="char-submit">Add character</button>
+            <button class="btn quiet" type="button" id="char-cancel" hidden>Cancel</button>
+            <span class="msg" id="char-msg" role="status"></span>
+          </div>
+        </form>
+        <ul class="admin-list" id="char-list"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>About text</h2>
+        <form id="about-form">
+          <label style="margin-bottom:.75rem">Text (a blank line starts a new paragraph)
+            <textarea name="text" maxlength="20000" style="min-height:10rem"></textarea></label>
+          <div class="actions">
+            <button class="btn">Save text</button>
+            <span class="msg" id="about-msg" role="status"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Guild history</h2>
+        <form id="ms-form">
+          <div class="row">
+            <label>Date <input type="date" name="date" required></label>
+            <label>Title <input type="text" name="title" maxlength="100" required placeholder="First kill: ..."></label>
+          </div>
+          <label style="margin-bottom:.75rem">Description <textarea name="description" maxlength="1000" style="min-height:3.5rem"></textarea></label>
+          <div class="actions">
+            <button class="btn">Add to history</button>
+            <span class="msg" id="ms-msg" role="status"></span>
+          </div>
+        </form>
+        <ul class="admin-list" id="ms-list"></ul>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    let meta, editingEvent = null, editingChar = null;
+
+    function say(id, text, isError) {
+      const m = $(id);
+      m.textContent = text;
+      m.className = isError ? 'msg error' : 'msg';
+    }
+
+    // Runs an admin action and shows the outcome next to the form's button.
+    async function attempt(msgId, okText, action) {
+      try { await action(); say(msgId, okText); }
+      catch (err) { say(msgId, err.message, true); }
+    }
+
+    function listItem(text, buttons) {
+      return el('li', {}, el('span', { class: 'what', text }), el('span', { class: 'actions' }, buttons));
+    }
+    const smallBtn = (text, onclick) => el('button', { class: 'btn quiet small', type: 'button', text, onclick });
+
+    // ---- Events ----
+    const eventForm = $('event-form');
+
+    function resetEventForm() {
+      editingEvent = null;
+      eventForm.reset();
+      $('req-level-value').disabled = true;
+      $('event-heading').textContent = 'Add event';
+      $('event-submit').textContent = 'Add event';
+      $('event-cancel').hidden = true;
+    }
+
+    function editEvent(ev) {
+      editingEvent = ev.id;
+      eventForm.title.value = ev.title;
+      eventForm.startsAt.value = ev.startsAt.slice(0, 16);
+      eventForm.startingPoint.value = ev.startingPoint;
+      eventForm.description.value = ev.description;
+      $('req-level').checked = !!ev.minLevel;
+      $('req-level-value').disabled = !ev.minLevel;
+      $('req-level-value').value = ev.minLevel || '';
+      for (const box of document.querySelectorAll('#req-others input')) box.checked = ev.requirements.includes(box.value);
+      $('event-heading').textContent = 'Edit event';
+      $('event-submit').textContent = 'Save event';
+      $('event-cancel').hidden = false;
+      say('event-msg', '');
+      eventForm.scrollIntoView({ block: 'center' });
+    }
+
+    async function loadEvents() {
+      const events = await api('events');
+      $('event-list').replaceChildren(...events.reverse().map(ev => {
+        const p = eventParts(ev.startsAt);
+        return listItem(`${p.day} ${p.month} ${p.date.getFullYear()} ${p.time} · ${ev.title}`, [
+          smallBtn('Edit', () => editEvent(ev)),
+          smallBtn('Delete', async () => {
+            if (!confirm(`Delete the event "${ev.title}"?`)) return;
+            await attempt('event-msg', 'Event deleted.', () => api(`events/${ev.id}`, 'DELETE'));
+            if (editingEvent === ev.id) resetEventForm();
+            loadEvents();
+          })
+        ]);
+      }));
+    }
+
+    $('req-level').addEventListener('change', e => {
+      $('req-level-value').disabled = !e.target.checked;
+      if (e.target.checked) $('req-level-value').focus();
+    });
+    $('event-cancel').addEventListener('click', () => { resetEventForm(); say('event-msg', ''); });
+
+    eventForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const wantsLevel = $('req-level').checked;
+      const level = Number($('req-level-value').value);
+      if (wantsLevel && !level) return say('event-msg', 'Fill in the minimum level, or untick it.', true);
+      const body = {
+        title: eventForm.title.value,
+        startsAt: eventForm.startsAt.value.slice(0, 16) + ':00',
+        startingPoint: eventForm.startingPoint.value,
+        description: eventForm.description.value,
+        minLevel: wantsLevel ? level : null,
+        requirements: [...document.querySelectorAll('#req-others input:checked')].map(b => b.value)
+      };
+      const wasEditing = editingEvent;
+      await attempt('event-msg', wasEditing ? 'Event saved.' : 'Event added.', async () => {
+        await (wasEditing ? api(`events/${wasEditing}`, 'PUT', body) : api('events', 'POST', body));
+        resetEventForm();
+        await loadEvents();
+      });
+    });
+
+    // ---- Characters ----
+    const charForm = $('char-form');
+
+    function resetCharForm() {
+      editingChar = null;
+      charForm.reset();
+      $('char-heading').textContent = 'Add character';
+      $('char-submit').textContent = 'Add character';
+      $('char-cancel').hidden = true;
+    }
+
+    function editChar(c) {
+      editingChar = c.id;
+      for (const k of ['name', 'class', 'race', 'level', 'armoryUrl', 'description']) charForm[k].value = c[k];
+      $('char-heading').textContent = 'Edit character';
+      $('char-submit').textContent = 'Save character';
+      $('char-cancel').hidden = false;
+      say('char-msg', '');
+      charForm.scrollIntoView({ block: 'center' });
+    }
+
+    async function loadChars() {
+      const chars = await api('characters');
+      chars.sort((a, b) => a.name.localeCompare(b.name));
+      $('char-list').replaceChildren(...chars.map(c =>
+        listItem(`${c.name} · level ${c.level} ${c.race} ${c.class}`.replace(/\s+/g, ' '), [
+          smallBtn('Edit', () => editChar(c)),
+          smallBtn('Delete', async () => {
+            if (!confirm(`Remove ${c.name} from the guild list?`)) return;
+            await attempt('char-msg', 'Character removed.', () => api(`characters/${c.id}`, 'DELETE'));
+            if (editingChar === c.id) resetCharForm();
+            loadChars();
+          })
+        ])));
+    }
+
+    $('char-cancel').addEventListener('click', () => { resetCharForm(); say('char-msg', ''); });
+
+    charForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const body = {
+        name: charForm.name.value, class: charForm.class.value, race: charForm.race.value,
+        level: Number(charForm.level.value), armoryUrl: charForm.armoryUrl.value, description: charForm.description.value
+      };
+      const wasEditing = editingChar;
+      await attempt('char-msg', wasEditing ? 'Character saved.' : 'Character added.', async () => {
+        await (wasEditing ? api(`characters/${wasEditing}`, 'PUT', body) : api('characters', 'POST', body));
+        resetCharForm();
+        await loadChars();
+      });
+    });
+
+    // ---- About and history ----
+    const aboutForm = $('about-form'), msForm = $('ms-form');
+
+    async function loadAbout() {
+      const about = await api('about');
+      aboutForm.text.value = about.text;
+      $('ms-list').replaceChildren(...about.milestones.map(m =>
+        listItem(`${m.date} · ${m.title}`, [
+          smallBtn('Delete', async () => {
+            if (!confirm(`Delete "${m.title}" from the guild history?`)) return;
+            await attempt('ms-msg', 'Deleted.', () => api(`milestones/${m.id}`, 'DELETE'));
+            loadAbout();
+          })
+        ])));
+    }
+
+    aboutForm.addEventListener('submit', e => {
+      e.preventDefault();
+      attempt('about-msg', 'Text saved.', () => api('about', 'PUT', { text: aboutForm.text.value }));
+    });
+
+    msForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const body = { date: msForm.date.value, title: msForm.title.value, description: msForm.description.value };
+      await attempt('ms-msg', 'Added to the history.', async () => {
+        await api('milestones', 'POST', body);
+        msForm.reset();
+        await loadAbout();
+      });
+    });
+
+    // ---- Sign-in ----
+    $('login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      try { await api('login', 'POST', { password: $('password').value }); location.reload(); }
+      catch (err) { $('login-msg').textContent = err.message; }
+    });
+    $('logout').addEventListener('click', async () => { await api('logout', 'POST'); location.reload(); });
+
+    metaPromise.then(m => {
+      meta = m;
+      if (!meta.admin) { $('login').hidden = false; $('password').focus(); return; }
+      $('admin').hidden = false;
+      charForm.class.append(...meta.classes.map(c => el('option', { text: c })));
+      charForm.race.append(...meta.races.map(r => el('option', { text: r })));
+      $('req-others').append(...meta.requirements.map(r =>
+        el('label', { class: 'check' }, el('input', { type: 'checkbox', value: r }), r)));
+      loadEvents(); loadChars(); loadAbout();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guild members · Jawbreakers</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <main>
+    <h1>Guild members</h1>
+    <p class="lead">Pick a character to read more about it.</p>
+    <div id="classes" class="class-grid"></div>
+    <p id="error" class="msg error"></p>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    let isAdmin = false;
+
+    function detailPanel(c) {
+      const text = el('p', { text: c.description || 'No description yet.', class: !c.description && 'muted' });
+      const panel = el('div', { class: 'char-detail', id: `detail-${c.id}`, hidden: true }, text);
+      if (c.armoryUrl) panel.append(el('p', {}, el('a', { href: c.armoryUrl, target: '_blank', rel: 'noopener', text: `${c.name} on the Armory` })));
+      if (isAdmin) {
+        const box = el('textarea', { maxlength: 2000, 'aria-label': `Description of ${c.name}` });
+        box.value = c.description;
+        const msg = el('span', { class: 'msg', role: 'status' });
+        panel.append(el('form', {
+          onsubmit: async e => {
+            e.preventDefault();
+            try {
+              const saved = await api(`characters/${c.id}/description`, 'PUT', { description: box.value });
+              c.description = saved.description;
+              text.textContent = saved.description || 'No description yet.';
+              text.className = saved.description ? '' : 'muted';
+              msg.className = 'msg'; msg.textContent = 'Saved.';
+            } catch (err) { msg.className = 'msg error'; msg.textContent = err.message; }
+          }
+        }, el('label', {}, 'Description', box), el('div', { class: 'actions', style: 'margin-top:.5rem' }, el('button', { class: 'btn small', text: 'Save description' }), msg)));
+      }
+      return panel;
+    }
+
+    function characterItem(c) {
+      const panel = detailPanel(c);
+      const button = el('button', {
+        class: 'char-btn', type: 'button', 'aria-expanded': 'false', 'aria-controls': panel.id,
+        onclick: () => { panel.hidden = !panel.hidden; button.setAttribute('aria-expanded', String(!panel.hidden)); }
+      }, el('span', { class: 'name', text: c.name }), el('span', { class: 'meta', text: `Level ${c.level} ${c.race}`.trim() }));
+      return el('li', {},
+        el('div', { class: 'char-row' }, button,
+          c.armoryUrl && el('a', { class: 'armory', href: c.armoryUrl, target: '_blank', rel: 'noopener', 'aria-label': `${c.name} on the Armory`, text: 'Armory ↗' })),
+        panel);
+    }
+
+    Promise.all([metaPromise, api('characters')]).then(([meta, characters]) => {
+      isAdmin = meta.admin;
+      const grid = document.getElementById('classes');
+      for (const cls of meta.classes) {
+        const mine = characters.filter(c => c.class === cls);
+        grid.append(el('section', { class: 'panel class-list', style: `--class:${CLASS_COLORS[cls] || 'var(--gold)'}` },
+          el('header', {}, el('h2', { text: cls }), el('span', { class: 'muted', text: String(mine.length) })),
+          mine.length ? el('ul', {}, mine.map(characterItem)) : el('p', { class: 'empty', text: 'No characters yet.' })));
+      }
+    }).catch(err => { document.getElementById('error').textContent = err.message; });
+  </script>
+</body>
+</html>

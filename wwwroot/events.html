@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Events · Jawbreakers</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <main>
+    <h1>Events</h1>
+    <p class="lead">All times are realm time.</p>
+    <div id="upcoming"></div>
+    <details id="past" class="past" hidden>
+      <summary>Past events</summary>
+      <div id="past-list"></div>
+    </details>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    api('events').then(events => {
+      const now = new Date();
+      const upcoming = events.filter(e => new Date(e.startsAt) >= now);
+      const past = events.filter(e => new Date(e.startsAt) < now).reverse();
+      const up = document.getElementById('upcoming');
+      if (upcoming.length) up.append(...upcoming.map(eventCard));
+      else up.append(el('p', { class: 'panel muted', text: 'No events planned right now. Check back soon.' }));
+      if (past.length) {
+        document.getElementById('past-list').append(...past.map(eventCard));
+        document.getElementById('past').hidden = false;
+      }
+    }).catch(err => document.getElementById('upcoming').append(el('p', { class: 'msg error', text: err.message })));
+  </script>
+</body>
+</html>

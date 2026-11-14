@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About · Jawbreakers</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <main>
+    <h1>About Jawbreakers</h1>
+    <p class="lead">Horde guild on the EU PvP ruleset.</p>
+
+    <div class="about">
+      <section class="panel about-text" id="text"></section>
+      <div class="about-image" role="img" aria-label="The Jawbreakers warband in front of the fortress gates"></div>
+    </div>
+
+    <section class="panel" style="margin-top:1.5rem">
+      <h2>Guild history</h2>
+      <ol class="timeline" id="timeline"></ol>
+      <p id="no-history" class="muted" hidden>Our first kills and other achievements will be listed here.</p>
+    </section>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    api('about').then(about => {
+      const text = document.getElementById('text');
+      for (const para of about.text.split(/\n\s*\n/)) text.append(el('p', { text: para.trim() }));
+      const list = document.getElementById('timeline');
+      for (const m of about.milestones) {
+        const date = new Date(m.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        list.append(el('li', {},
+          el('time', { datetime: m.date, text: date }),
+          el('h3', { text: m.title }),
+          m.description && el('p', { text: m.description })));
+      }
+      document.getElementById('no-history').hidden = about.milestones.length > 0;
+      list.hidden = about.milestones.length === 0;
+    }).catch(err => document.getElementById('text').append(el('p', { class: 'msg error', text: err.message })));
+  </script>
+</body>
+</html>

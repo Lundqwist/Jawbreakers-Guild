@@ -1,0 +1,29 @@
+# Runs the Jawbreakers guild site on the Synology NAS with Container Manager.
+#
+# Lives on the NAS in /volume1/docker/jawbreakers/ next to:
+#   app/    the published site (copied there by deploy.ps1)
+#   data/   the SQLite database and cookie keys (created automatically, never touched by deploys)
+#   .env    the admin password (secret, see .env.example)
+#
+# Uses Microsoft's official .NET 8 runtime image, so no image has to be built.
+
+services:
+  jawbreakers:
+    image: mcr.microsoft.com/dotnet/aspnet:8.0
+    container_name: jawbreakers
+    restart: unless-stopped
+    # The NAS's own network: DSM's reverse proxy reaches the site at localhost:8095
+    network_mode: host
+    working_dir: /app
+    command: ["dotnet", "Jawbreakers.dll"]
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Listen only on the NAS itself; visitors come in through the reverse proxy (HTTPS)
+      - ASPNETCORE_URLS=http://127.0.0.1:8095
+      - DataDir=/data
+      # The admin page's password, read from the .env file. Empty = admin sign-in is off.
+      - Admin__Password=${ADMIN_PASSWORD:-}
+      - TZ=Europe/Stockholm
+    volumes:
+      - ./app:/app:ro
+      - ./data:/data
