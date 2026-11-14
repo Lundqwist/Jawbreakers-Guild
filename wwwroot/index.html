@@ -8,7 +8,9 @@
 </head>
 <body>
   <div class="hero">
-    <img src="img/hero.webp" width="768" height="435" alt="Jawbreakers, for the Horde: five Horde warriors in front of a fortress hung with red banners">
+    <video id="hero-video" src="video/hero.mp4" poster="img/hero.webp" width="1264" height="720"
+           autoplay muted loop playsinline preload="auto"
+           aria-label="Jawbreakers, for the Horde: five Horde warriors in front of a fortress hung with red banners"></video>
   </div>
   <main>
     <div class="tagline">
@@ -31,6 +33,13 @@
 
   <script src="js/common.js"></script>
   <script>
+    // Visitors who ask for less motion get the still poster image instead.
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const v = document.getElementById('hero-video');
+      v.removeAttribute('autoplay');
+      v.pause();
+    }
+
     api('events').then(events => {
       const next = events.find(e => new Date(e.startsAt) >= new Date());
       if (!next) return;
