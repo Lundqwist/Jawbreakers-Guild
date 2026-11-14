@@ -53,10 +53,11 @@ The database is created in `data/` on first start.
 - **Members**: `seed/roster.json`, taken from the guild's page on the official Armory on 2026-11-14. Characters below level 10
   have no Armory page, so they have no link and no known race.
 - **Profession skill levels**: `seed/professions.json`, from each character's Armory page on the same day.
-- **Recipes**: `wwwroot/recipes/<profession>.json` holds every recipe of a profession: spell id, name, required skill, source,
+- **Recipes**: `wwwroot/recipes/<profession>.json` holds every recipe of a profession: spell id, name, category, required skill, source,
   what it makes and the materials, plus the names and icons of the items involved. Taken from
   [Wowhead's WoW: Forever database](https://www.wowhead.com/forever) on 2026-11-14 (2,215 recipes). The page links each recipe
-  and material to Wowhead, whose `power.js` script shows the tooltips.
+  and material to Wowhead, whose `power.js` script shows the tooltips. The category (armor slot, weapon type, potion, enchant
+  slot and so on) comes from the made item's type on Wowhead, or for enchants from the recipe name.
 
 All three are one-time imports: after that the admin keeps the members and skill levels up to date by hand.
 

@@ -222,7 +222,9 @@ a.crafter:hover { border-color: var(--ember); }
 .recipe-tools input[type=text] { width: auto; flex: 1 1 14rem; max-width: 22rem; margin: 0; }
 .recipe-head, .recipe { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: .25rem 1rem; }
 .recipe-head { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
+.recipe-tools select { width: auto; margin: 0; }
 .recipe-list { list-style: none; margin: 0; padding: 0; }
+.recipe-group { color: var(--gold); font-family: Georgia, serif; letter-spacing: .06em; text-transform: uppercase; font-size: .85rem; padding: 1rem 0 .3rem; border-bottom: 1px solid var(--line); }
 .recipe { padding: .5rem 0; border-bottom: 1px solid rgba(74, 42, 31, .6); align-items: start; }
 .recipe a { text-decoration: none; }
 .recipe a:hover { text-decoration: underline; }
