@@ -9,13 +9,26 @@
 <body>
   <main>
     <h1>Guild members</h1>
-    <p class="lead">Pick a character to read more about it.</p>
+    <p class="lead">Pick a class to see its characters. A character opens its page on the Armory.</p>
     <div class="armory-bar">
       <button class="btn" id="armory-btn" type="button" disabled>Update from the Armory</button>
       <span class="muted small" id="armory-status" role="status"></span>
     </div>
     <div id="armory-result" class="panel armory-result" hidden></div>
-    <div id="classes" class="class-grid"></div>
+    <hr class="rule">
+    <div id="classes" class="class-tiles"></div>
+
+    <dialog id="class-window" class="class-window" aria-labelledby="window-title">
+      <header>
+        <img id="window-icon" alt="" width="40" height="40">
+        <div>
+          <h2 id="window-title"></h2>
+          <span class="muted small" id="window-count"></span>
+        </div>
+        <button class="btn quiet small" id="window-close" type="button">Close</button>
+      </header>
+      <ul id="window-list"></ul>
+    </dialog>
     <p id="error" class="msg error"></p>
   </main>
 
@@ -23,55 +36,78 @@
   <script>
     let isAdmin = false, skills = [];
 
-    function detailPanel(c) {
-      const text = el('p', { text: c.description || 'No description yet.', class: !c.description && 'muted' });
-      const panel = el('div', { class: 'char-detail', id: `detail-${c.id}`, hidden: true }, text);
-      const mine = skills.filter(s => s.characterId === c.id).sort((a, b) => b.skill - a.skill);
-      if (mine.length) panel.append(el('p', { class: 'muted' }, 'Professions: ',
-        mine.flatMap((s, i) => [i > 0 && ', ', el('a', { href: `crafting.html#${s.profession.toLowerCase().replace(/[^a-z]+/g, '-')}`, text: s.profession }), ` ${s.skill}`])));
-      if (c.armoryUrl) panel.append(el('p', {}, el('a', { href: c.armoryUrl, target: '_blank', rel: 'noopener', text: `${c.name} on the Armory` })));
-      if (isAdmin) {
-        const box = el('textarea', { maxlength: 2000, 'aria-label': `Description of ${c.name}` });
-        box.value = c.description;
-        const msg = el('span', { class: 'msg', role: 'status' });
-        panel.append(el('form', {
-          onsubmit: async e => {
-            e.preventDefault();
-            try {
-              const saved = await api(`characters/${c.id}/description`, 'PUT', { description: box.value });
-              c.description = saved.description;
-              text.textContent = saved.description || 'No description yet.';
-              text.className = saved.description ? '' : 'muted';
-              msg.className = 'msg'; msg.textContent = 'Saved.';
-            } catch (err) { msg.className = 'msg error'; msg.textContent = err.message; }
-          }
-        }, el('label', {}, 'Description', box), el('div', { class: 'actions', style: 'margin-top:.5rem' }, el('button', { class: 'btn small', text: 'Save description' }), msg)));
-      }
-      return panel;
+    const classIcon = cls => `https://wow.zamimg.com/images/wow/icons/large/classicon_${cls.toLowerCase()}.jpg`;
+    const win = document.getElementById('class-window');
+    let openClass = null, byClass = new Map();
+
+    // Admin only: a description box under the character.
+    function descriptionEditor(c, text) {
+      const box = el('textarea', { maxlength: 2000, 'aria-label': `Description of ${c.name}` });
+      box.value = c.description;
+      const msg = el('span', { class: 'msg', role: 'status' });
+      return el('details', { class: 'char-edit' }, el('summary', { text: 'Edit description' }), el('form', {
+        onsubmit: async e => {
+          e.preventDefault();
+          try {
+            const saved = await api(`characters/${c.id}/description`, 'PUT', { description: box.value });
+            c.description = saved.description;
+            text.textContent = saved.description;
+            text.hidden = !saved.description;
+            msg.className = 'msg'; msg.textContent = 'Saved.';
+          } catch (err) { msg.className = 'msg error'; msg.textContent = err.message; }
+        }
+      }, box, el('div', { class: 'actions', style: 'margin-top:.5rem' }, el('button', { class: 'btn small', text: 'Save description' }), msg)));
     }
 
+    // One character in the window. The whole row is a link to its Armory page (characters below level 10 have none).
     function characterItem(c) {
-      const panel = detailPanel(c);
-      const button = el('button', {
-        class: 'char-btn', type: 'button', 'aria-expanded': 'false', 'aria-controls': panel.id,
-        onclick: () => { panel.hidden = !panel.hidden; button.setAttribute('aria-expanded', String(!panel.hidden)); }
-      }, el('span', { class: 'name', text: c.name }), el('span', { class: 'meta', text: `Level ${c.level} ${c.race}`.trim() }));
+      const mine = skills.filter(s => s.characterId === c.id).sort((a, b) => b.skill - a.skill);
+      const text = el('span', { class: 'desc', text: c.description, hidden: !c.description });
+      const body = [
+        el('span', { class: 'top' },
+          el('span', { class: 'name', text: c.name }),
+          el('span', { class: 'meta', text: `Level ${c.level} ${c.race}`.trim() }),
+          el('span', { class: 'go', text: c.armoryUrl ? 'Armory ↗' : 'No Armory page yet' })),
+        mine.length > 0 && el('span', { class: 'profs', text: mine.map(s => `${s.profession} ${s.skill}`).join(' · ') }),
+        text];
       return el('li', {},
-        el('div', { class: 'char-row' }, button,
-          c.armoryUrl && el('a', { class: 'armory', href: c.armoryUrl, target: '_blank', rel: 'noopener', 'aria-label': `${c.name} on the Armory`, text: 'Armory ↗' })),
-        panel);
+        c.armoryUrl
+          ? el('a', { class: 'char-card', href: c.armoryUrl, target: '_blank', rel: 'noopener', 'aria-label': `${c.name}, level ${c.level}: open the Armory page` }, body)
+          : el('div', { class: 'char-card none' }, body),
+        isAdmin && descriptionEditor(c, text));
     }
+
+    function showClass(cls) {
+      openClass = cls;
+      const mine = byClass.get(cls) || [];
+      win.style.setProperty('--class', CLASS_COLORS[cls] || 'var(--gold)');
+      document.getElementById('window-icon').src = classIcon(cls);
+      document.getElementById('window-title').textContent = cls;
+      document.getElementById('window-count').textContent = mine.length === 1 ? '1 character' : `${mine.length} characters`;
+      document.getElementById('window-list').replaceChildren(...(mine.length ? mine.map(characterItem) : [el('li', { class: 'muted', text: 'No characters of this class yet.' })]));
+      if (!win.open) win.showModal();
+    }
+
+    document.getElementById('window-close').addEventListener('click', () => win.close());
+    // A click on the dark area around the window closes it
+    win.addEventListener('click', e => { if (e.target === win) win.close(); });
+    win.addEventListener('close', () => { openClass = null; });
 
     async function loadMembers() {
       const [meta, characters, crafting] = await Promise.all([metaPromise, api('characters'), api('crafting')]);
       isAdmin = meta.admin;
       skills = crafting.skills;
+      byClass = new Map(meta.classes.map(cls => [cls, characters.filter(c => c.class === cls)]));
       document.getElementById('classes').replaceChildren(...meta.classes.map(cls => {
-        const mine = characters.filter(c => c.class === cls);
-        return el('section', { class: 'panel class-list', style: `--class:${CLASS_COLORS[cls] || 'var(--gold)'}` },
-          el('header', {}, el('h2', { text: cls }), el('span', { class: 'muted', text: String(mine.length) })),
-          mine.length ? el('ul', {}, mine.map(characterItem)) : el('p', { class: 'empty', text: 'No characters yet.' }));
+        const mine = byClass.get(cls);
+        return el('button', { class: 'class-tile', type: 'button', style: `--class:${CLASS_COLORS[cls] || 'var(--gold)'}`, 'aria-haspopup': 'dialog', onclick: () => showClass(cls) },
+          el('img', { src: classIcon(cls), alt: '', width: 56, height: 56 }),
+          el('span', { class: 'label' },
+            el('span', { class: 'name', text: cls }),
+            el('span', { class: 'count', text: mine.length === 0 ? 'No characters yet' : mine.length === 1 ? '1 character' : `${mine.length} characters` }),
+            mine.length > 0 && el('span', { class: 'levels', text: `Highest level ${Math.max(...mine.map(c => c.level))}` })));
       }));
+      if (openClass) showClass(openClass); // keep the open window in step after an update
     }
     loadMembers().catch(err => { document.getElementById('error').textContent = err.message; });
 
