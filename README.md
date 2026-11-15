@@ -55,7 +55,7 @@ The database is created in `data/` on first start.
 - **Profession skill levels**: `seed/professions.json`, from each character's Armory page on the same day.
 - **Recipes**: `wwwroot/recipes/<profession>.json` holds every recipe of a profession: spell id, name, category, required skill, source,
   what it makes and the materials, plus the names and icons of the items involved. Taken from
-  [Wowhead's WoW: Forever database](https://www.wowhead.com/forever) on 2026-11-14 (2,215 recipes). The page links each recipe
+  [Wowhead's WoW: Forever database](https://www.wowhead.com/forever) on 2026-11-14 (2,215 recipes). Each recipe that is learned from an item (a pattern, plans, formula and so on) also carries that item (`recipe`: id, name, quality), matched by name against Wowhead's recipe item lists; the page shows it as a link, and "Learned from trainer" for the others. The page links each recipe
   and material to Wowhead, whose `power.js` script shows the tooltips. The category (armor slot, weapon type, potion, enchant
   slot and so on) comes from the made item's type on Wowhead, or for enchants from the recipe name.
 

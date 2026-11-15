@@ -55,6 +55,16 @@
     // A trainer recipe (or one with no known source: the basic ones) is known once the skill is there.
     const isTrained = r => r.src.length === 0 || r.src.includes(6);
 
+    // Where the recipe is learned: the trainer, or the item that teaches it (a link to Wowhead, with its tooltip).
+    function learnedFrom(r) {
+      const where = r.src.map(s => SOURCES[s]).filter(Boolean).join(' or ');
+      if (r.src.includes(6)) return 'Learned from trainer';
+      if (r.recipe) return [
+        el('a', { href: `${WOWHEAD}item=${r.recipe[0]}`, target: '_blank', rel: 'noopener', style: `color:${QUALITY[r.recipe[2]] || '#fff'}`, text: r.recipe[1] }),
+        where && ` (${where})`];
+      return where ? `Recipe from ${where}` : 'Learned from trainer';
+    }
+
     function recipeCrafters(profession, r, all) {
       // Without Blizzard's API nobody knows who has learned what: a trainer recipe then lists everyone with enough skill
       if (!exact && isTrained(r)) return all.filter(c => c.skill >= r.skill);
@@ -71,7 +81,7 @@
           el('a', { href: `${WOWHEAD}spell=${r.id}`, target: '_blank', rel: 'noopener', style: `color:${QUALITY[made ? made[2] : 1] || '#fff'}` },
             icon(r.icon || (made && made[1])), r.name),
           count && count !== 1 && el('span', { class: 'muted', text: ` ×${count}` }),
-          el('div', { class: 'muted small', text: `Skill ${r.skill}` + (isTrained(r) ? '' : ' · recipe from ' + (r.src.map(s => SOURCES[s]).filter(Boolean).join(' or ') || 'the world')) })),
+          el('div', { class: 'muted small' }, `Skill ${r.skill} · `, learnedFrom(r))),
         el('ul', { class: 'mats', 'aria-label': 'Materials' }, r.mats.map(([id, n]) => {
           const item = data.items[id] || ['Item ' + id, '', 1];
           return el('li', {}, `${n}× `, el('a', { href: `${WOWHEAD}item=${id}`, target: '_blank', rel: 'noopener', style: `color:${QUALITY[item[2]] || '#fff'}` }, icon(item[1]), item[0]));
