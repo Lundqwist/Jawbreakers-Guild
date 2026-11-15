@@ -209,6 +209,27 @@ a.char-card:hover, a.char-card:focus-visible { border-color: var(--class); backg
 .char-card .desc { white-space: pre-wrap; font-size: .95rem; margin-top: .2rem; }
 .char-edit { padding: .3rem .8rem 0; font-size: .85rem; }
 .char-edit summary { cursor: pointer; color: var(--muted); }
+button.char-card { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+button.char-card:hover, button.char-card:focus-visible { border-color: var(--class); background: color-mix(in srgb, var(--class) 9%, rgba(0, 0, 0, .22)); }
+.char-window { width: min(860px, calc(100vw - 2rem)); }
+.char-body { padding: 1rem 1.2rem 1.2rem; overflow-y: auto; }
+.char-body .desc { white-space: pre-wrap; }
+.char-sheet { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.char-sheet .render { width: 100%; height: 380px; border-radius: 4px; border: 1px solid var(--line); background: #1a0f0c 50% 45% / auto 150% no-repeat; }
+/* Two label/value pairs per row */
+.stats { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: .15rem 1rem; margin: 0 0 .8rem; }
+.stats dt { color: var(--muted); font-size: .9rem; }
+.stats dd { margin: 0 1rem 0 0; text-align: right; font-weight: 600; }
+.char-body h3 { color: var(--gold); margin: 1.1rem 0 .5rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+.gear { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .3rem 1.5rem; }
+.gear li { display: flex; gap: .6rem; align-items: baseline; min-width: 0; }
+.gear .slot { flex: 0 0 5.2rem; color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+.gear a { text-decoration: none; overflow-wrap: anywhere; }
+.gear a:hover { text-decoration: underline; }
+@media (max-width: 700px) {
+  .char-sheet, .gear { grid-template-columns: 1fr; }
+  .char-sheet .render { height: 300px; }
+}
 .armory-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: 1.25rem; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .armory-result { margin-bottom: 1.25rem; font-size: .9rem; }

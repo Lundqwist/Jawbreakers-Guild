@@ -109,6 +109,7 @@ public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<
             if (result.Error is not null || (result.Failed.Count > 0 && result.Failed.Count + result.NoPage.Count == result.Checked))
                 await SetText(db, "armory-update", "");
             await SetText(db, "armory-result", JsonSerializer.Serialize(result, Web));
+            Sheets.Clear(); // the character windows read fresh data after an update
             return result;
         }
         finally { OneAtATime.Release(); }
@@ -298,6 +299,108 @@ public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<
             all[p.Name] = byName;
         }
         return all;
+    }
+
+    // ---- One character's sheet (picture, gear, stats), for the character window on the Guild members page ----
+
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<int, (DateTime At, object Sheet)> Sheets = new();
+
+    /// <summary>
+    /// The character's picture, gear and stats from Blizzard's API, kept for an hour.
+    /// Null when there is no API client, or the character has no profile (below level 10).
+    /// </summary>
+    public async Task<object?> CharacterSheet(Character c)
+    {
+        if (!UsesApi || !c.ArmoryUrl.StartsWith(CharacterPrefix, StringComparison.OrdinalIgnoreCase)) return null;
+        if (Sheets.TryGetValue(c.Id, out var kept) && DateTime.UtcNow - kept.At < Cooldown) return kept.Sheet;
+
+        var slug = c.ArmoryUrl[CharacterPrefix.Length..]; // already escaped for an address
+        var profile = $"{Api}/profile/wow/character/{slug}";
+        try
+        {
+            var requests = new[] { "", "/equipment", "/character-media", "/statistics" }
+                .Select(part => GetJson($"{profile}{part}?{ProfileNamespace}")).ToArray();
+            var docs = await Task.WhenAll(requests);
+            try
+            {
+                if (docs[0] is null) return null;
+                var summary = docs[0]!.RootElement;
+
+                var gear = new List<object>();
+                if (docs[1] is not null && docs[1]!.RootElement.TryGetProperty("equipped_items", out var items) && items.ValueKind == JsonValueKind.Array)
+                    foreach (var item in items.EnumerateArray())
+                        gear.Add(new
+                        {
+                            slot = Name(item, "slot"),
+                            name = Text(item, "name"),
+                            quality = Name(item, "quality", "type"),
+                            id = Id(item, "item"),
+                            level = item.TryGetProperty("level", out var il) ? (int)Number(il, "value") : 0
+                        });
+
+                var pictures = new Dictionary<string, string>();
+                if (docs[2] is not null && docs[2]!.RootElement.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
+                    foreach (var a in assets.EnumerateArray()) pictures[Text(a, "key")] = Text(a, "value");
+
+                var stats = new List<object>();
+                if (docs[3] is not null)
+                {
+                    var s = docs[3]!.RootElement;
+                    void Add(string label, string property, bool percent = false, bool always = false)
+                    {
+                        var value = Number(s, property);
+                        if (value <= 0 && !always) return;
+                        stats.Add(new { label, value = percent ? value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%" : Math.Round(value).ToString("0") });
+                    }
+                    Add("Health", "health", always: true);
+                    var power = Name(s, "power_type");
+                    if (power.Length > 0) Add(power, "power", always: true);
+                    Add("Strength", "strength", always: true);
+                    Add("Agility", "agility", always: true);
+                    Add("Stamina", "stamina", always: true);
+                    Add("Intellect", "intellect", always: true);
+                    Add("Spirit", "spirit");
+                    Add("Armor", "armor", always: true);
+                    Add("Attack power", "attack_power");
+                    Add("Spell power", "spell_power");
+                    Add("Melee crit", "melee_crit", percent: true);
+                    Add("Ranged crit", "ranged_crit", percent: true);
+                    Add("Spell crit", "spell_crit", percent: true);
+                    Add("Dodge", "dodge", percent: true);
+                    Add("Parry", "parry", percent: true);
+                    Add("Block", "block", percent: true);
+                }
+
+                var sheet = new
+                {
+                    render = pictures.GetValueOrDefault("main-raw", ""),
+                    avatar = pictures.GetValueOrDefault("avatar", ""),
+                    itemLevel = (int)Number(summary, "average_item_level"),
+                    lastLogin = summary.TryGetProperty("last_login_timestamp", out var seen) && seen.TryGetInt64(out var ms) ? ms : 0,
+                    gear,
+                    stats
+                };
+                Sheets[c.Id] = (DateTime.UtcNow, sheet);
+                return sheet;
+            }
+            finally { foreach (var d in docs) d?.Dispose(); }
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+        {
+            log.LogWarning("Character sheet: could not read {Name}: {Message}", c.Name, e.Message);
+            return null;
+        }
+    }
+
+    // A number that the API gives either plainly (health: 1272) or wrapped ({"effective": 47}, {"value": 4.9})
+    static double Number(JsonElement e, string property)
+    {
+        if (e.ValueKind != JsonValueKind.Object || !e.TryGetProperty(property, out var v)) return 0;
+        if (v.ValueKind == JsonValueKind.Number) return v.GetDouble();
+        if (v.ValueKind != JsonValueKind.Object) return 0;
+        foreach (var inner in new[] { "effective", "value" })
+            if (v.TryGetProperty(inner, out var n) && n.ValueKind == JsonValueKind.Number) return n.GetDouble();
+        return 0;
     }
 
     // ---- Without the API: the public Armory pages ----

@@ -257,8 +257,15 @@ admin.MapDelete("/characters/{id:int}", async (int id, GuildDb db) =>
     return Results.NoContent();
 });
 
-// ---- Update from the Armory ----
-// Anyone can start it from the Guild members page, but only once an hour (see ArmorySync.cs).
+// Picture, gear and stats for the character window. 404 when there is nothing to show (no API client, or below level 10).
+api.MapGet("/characters/{id:int}/sheet", async (int id, GuildDb db, ArmorySync armory) =>
+{
+    var c = await db.Characters.FindAsync(id);
+    var sheet = c is null ? null : await armory.CharacterSheet(c);
+    return sheet is null ? Results.NotFound() : Results.Ok(sheet);
+});
+
+// ---- Update from the Armory ----// Anyone can start it from the Guild members page, but only once an hour (see ArmorySync.cs).
 
 api.MapGet("/armory", async (GuildDb db) =>
 {

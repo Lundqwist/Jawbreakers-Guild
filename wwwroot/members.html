@@ -9,7 +9,7 @@
 <body>
   <main>
     <h1>Guild members</h1>
-    <p class="lead">Pick a class to see its characters. A character opens its page on the Armory.</p>
+    <p class="lead">Pick a class to see its characters, and a character to see its gear and stats.</p>
     <div class="armory-bar">
       <button class="btn" id="armory-btn" type="button" disabled>Update from the Armory</button>
       <span class="muted small" id="armory-status" role="status"></span>
@@ -29,10 +29,25 @@
       </header>
       <ul id="window-list"></ul>
     </dialog>
+
+    <dialog id="char-window" class="class-window char-window" aria-labelledby="char-title">
+      <header>
+        <img id="char-avatar" alt="" width="40" height="40">
+        <div>
+          <h2 id="char-title"></h2>
+          <span class="muted small" id="char-sub"></span>
+        </div>
+        <button class="btn quiet small" id="char-close" type="button">Close</button>
+      </header>
+      <div id="char-body" class="char-body"></div>
+    </dialog>
     <p id="error" class="msg error"></p>
   </main>
 
   <script src="js/common.js"></script>
+  <!-- Wowhead's tooltip script: tooltips and icons on the gear links in the character window -->
+  <script>const whTooltips = { colorLinks: false, iconizeLinks: true, renameLinks: false };</script>
+  <script src="https://wow.zamimg.com/widgets/power.js" defer></script>
   <script>
     let isAdmin = false, skills = [];
 
@@ -59,7 +74,7 @@
       }, box, el('div', { class: 'actions', style: 'margin-top:.5rem' }, el('button', { class: 'btn small', text: 'Save description' }), msg)));
     }
 
-    // One character in the window. The whole row is a link to its Armory page (characters below level 10 have none).
+    // One character in the class window. Pressing it opens the character's own window.
     function characterItem(c) {
       const mine = skills.filter(s => s.characterId === c.id).sort((a, b) => b.skill - a.skill);
       const text = el('span', { class: 'desc', text: c.description, hidden: !c.description });
@@ -67,15 +82,69 @@
         el('span', { class: 'top' },
           el('span', { class: 'name', text: c.name }),
           el('span', { class: 'meta', text: `Level ${c.level} ${c.race}`.trim() }),
-          el('span', { class: 'go', text: c.armoryUrl ? 'Armory ↗' : 'No Armory page yet' })),
+          el('span', { class: 'go', text: 'View ›' })),
         mine.length > 0 && el('span', { class: 'profs', text: mine.map(s => `${s.profession} ${s.skill}`).join(' · ') }),
         text];
       return el('li', {},
-        c.armoryUrl
-          ? el('a', { class: 'char-card', href: c.armoryUrl, target: '_blank', rel: 'noopener', 'aria-label': `${c.name}, level ${c.level}: open the Armory page` }, body)
-          : el('div', { class: 'char-card none' }, body),
+        el('button', { class: 'char-card', type: 'button', 'aria-haspopup': 'dialog', onclick: () => showCharacter(c) }, body),
         isAdmin && descriptionEditor(c, text));
     }
+
+    // ---- The character's own window: picture, gear and stats from Blizzard's API ----
+    const charWin = document.getElementById('char-window');
+    const ITEM_COLORS = { POOR: '#9d9d9d', COMMON: '#ffffff', UNCOMMON: '#1eff00', RARE: '#3d9bff', EPIC: '#c069ff', LEGENDARY: '#ff8000' };
+    let shownCharacter = null;
+
+    async function showCharacter(c) {
+      shownCharacter = c.id;
+      charWin.style.setProperty('--class', CLASS_COLORS[c.class] || 'var(--gold)');
+      document.getElementById('char-avatar').src = classIcon(c.class);
+      document.getElementById('char-title').textContent = c.name;
+      document.getElementById('char-sub').textContent = `Level ${c.level} ${c.race} ${c.class}`.replace(/\s+/g, ' ');
+
+      const mine = skills.filter(s => s.characterId === c.id).sort((a, b) => b.skill - a.skill);
+      const about = [
+        c.description && el('p', { class: 'desc', text: c.description }),
+        mine.length > 0 && el('p', { class: 'muted' }, 'Professions: ',
+          mine.flatMap((s, i) => [i > 0 && ', ', el('a', { href: `crafting.html#${s.profession.toLowerCase().replace(/[^a-z]+/g, '-')}`, text: s.profession }), ` ${s.skill}`]))];
+      const armory = c.armoryUrl && el('a', { href: c.armoryUrl, target: '_blank', rel: 'noopener', text: 'Open on the Armory ↗' });
+      const body = document.getElementById('char-body');
+      body.replaceChildren(...about.filter(Boolean), el('p', { class: 'muted', text: c.armoryUrl ? 'Loading gear and stats…' : 'Gear and stats are shown from level 10.' }));
+      if (!charWin.open) charWin.showModal();
+      if (!c.armoryUrl) return;
+
+      let sheet;
+      try { sheet = await api(`characters/${c.id}/sheet`); }
+      catch { sheet = null; }
+      if (shownCharacter !== c.id) return; // another character was opened in the meantime
+      if (!sheet) {
+        body.replaceChildren(...about.filter(Boolean), el('p', { class: 'muted', text: 'Gear and stats could not be loaded right now.' }), el('p', {}, armory));
+        return;
+      }
+
+      if (sheet.avatar) document.getElementById('char-avatar').src = sheet.avatar;
+      const seen = sheet.lastLogin ? new Date(sheet.lastLogin).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+      body.replaceChildren(
+        el('div', { class: 'char-sheet' },
+          // The picture has a lot of empty space around the character, so it is shown zoomed in
+          sheet.render && el('div', { class: 'render', role: 'img', 'aria-label': `${c.name} in full gear`, style: `background-image:url("${encodeURI(sheet.render)}")` }),
+          el('div', {},
+            ...about.filter(Boolean),
+            el('dl', { class: 'stats' }, sheet.stats.flatMap(s => [el('dt', { text: s.label }), el('dd', { text: s.value })])),
+            el('p', { class: 'muted small' }, [sheet.itemLevel > 0 && `Item level ${sheet.itemLevel}`, seen && `last seen ${seen}`].filter(Boolean).join(' · ')),
+            el('p', { class: 'small' }, armory))),
+        el('h3', { text: 'Gear' }),
+        sheet.gear.length
+          ? el('ul', { class: 'gear' }, sheet.gear.map(g => el('li', {},
+              el('span', { class: 'slot', text: g.slot }),
+              el('a', { href: `https://www.wowhead.com/forever/item=${g.id}`, target: '_blank', rel: 'noopener', style: `color:${ITEM_COLORS[g.quality] || '#fff'}`, text: g.name }))))
+          : el('p', { class: 'muted', text: 'Nothing equipped.' }));
+      window.$WowheadPower?.refreshLinks(); // gives the new gear links their icons
+    }
+
+    document.getElementById('char-close').addEventListener('click', () => charWin.close());
+    charWin.addEventListener('click', e => { if (e.target === charWin) charWin.close(); });
+    charWin.addEventListener('close', () => { shownCharacter = null; });
 
     function showClass(cls) {
       openClass = cls;
