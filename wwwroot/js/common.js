@@ -82,6 +82,11 @@ function eventCard(ev) {
     el('div', { class: 'inner' },
       el('a', { class: 'brand', href: './' }, 'Jaw', el('span', { text: 'breakers' })),
       el('nav', { class: 'nav', 'aria-label': 'Main' },
-        links.map(([href, text]) => el('a', { href, text, class: href === here && 'current', 'aria-current': href === here && 'page' }))))));
+        links.map(([href, text]) => el('a', {
+          href, text, class: href === here && 'current', 'aria-current': href === here && 'page',
+          // The Admin link is only shown to the signed-in admin (and on the admin page itself); the page is still at admin.html
+          id: href === 'admin.html' && 'nav-admin', hidden: href === 'admin.html' && here !== 'admin.html'
+        }))))));
+  metaPromise.then(meta => { if (meta.admin) document.getElementById('nav-admin').hidden = false; }).catch(() => {});
   document.body.append(el('footer', { class: 'site-footer', text: 'Jawbreakers · Horde · EU · PvP · For the Horde!' }));
 })();
