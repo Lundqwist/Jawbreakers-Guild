@@ -13,8 +13,8 @@
     <nav id="prof-nav" class="prof-nav" aria-label="Professions"></nav>
     <div id="professions"></div>
     <p class="muted crafting-note">
-      Skill levels come from the Armory. A recipe taught by a trainer lists everyone whose skill is high enough for it.
-      A recipe that drops, is sold or comes from a quest lists a character only once the admin has ticked them.
+      <span id="how-known">Skill levels come from the Armory. A recipe taught by a trainer lists everyone whose skill is high enough for it.
+      A recipe that drops, is sold or comes from a quest lists a character only once the admin has ticked them.</span>
       Recipe data and tooltips: <a href="https://www.wowhead.com/forever" target="_blank" rel="noopener">Wowhead</a>.
       Leveling guides: <a href="https://www.wow-professions.com/forever" target="_blank" rel="noopener">WoW-professions</a>.
     </p>
@@ -30,7 +30,7 @@
     const ICONS = 'https://wow.zamimg.com/images/wow/icons/small/';
     const QUALITY = ['#9d9d9d', '#ffffff', '#1eff00', '#3d9bff', '#c069ff', '#ff8000'];
     const SOURCES = { 2: 'drop', 4: 'quest', 5: 'vendor' };
-    let isAdmin = false, characters = new Map(), skills = [], known = [];
+    let isAdmin = false, characters = new Map(), skills = [], known = [], exact = false;
 
     // Categories A-Z, with the catch-all "Other" last.
     const byCategory = (a, b) => (a === 'Other') - (b === 'Other') || a.localeCompare(b);
@@ -56,7 +56,8 @@
     const isTrained = r => r.src.length === 0 || r.src.includes(6);
 
     function recipeCrafters(profession, r, all) {
-      if (isTrained(r)) return all.filter(c => c.skill >= r.skill);
+      // Without Blizzard's API nobody knows who has learned what: a trainer recipe then lists everyone with enough skill
+      if (!exact && isTrained(r)) return all.filter(c => c.skill >= r.skill);
       const ids = new Set(known.filter(k => k.profession === profession && k.spellId === r.id).map(k => k.characterId));
       return all.filter(c => ids.has(c.id));
     }
@@ -82,7 +83,7 @@
         const list = recipeCrafters(profession, r, all);
         row.dataset.craftable = list.length ? '1' : '';
         who.replaceChildren(list.length ? el('div', { class: 'crafters' }, list.map(c => characterChip(c))) : el('span', { class: 'muted', text: 'Nobody yet' }));
-        if (isAdmin && !isTrained(r) && all.length) who.append(tickButton());
+        if (isAdmin && !exact && !isTrained(r) && all.length) who.append(tickButton());
       }
 
       // Admin: tick who has learned this recipe.
@@ -180,6 +181,8 @@
       characters = new Map(chars.map(c => [c.id, c]));
       skills = crafting.skills;
       known = crafting.known;
+      exact = crafting.exact;
+      if (exact) document.getElementById('how-known').textContent = 'Skill levels and the recipes each character knows come from the Armory, through the update button on the Guild members page.';
       document.getElementById('prof-nav').append(...meta.professions.map(p => el('a', { href: '#' + slug(p.name), text: p.name })));
       document.getElementById('professions').append(...meta.professions.map(professionPanel));
       if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();

@@ -25,6 +25,9 @@ services:
       - DataDir=/data
       # The admin page's password, read from the .env file. Empty = admin sign-in is off.
       - Admin__Password=${ADMIN_PASSWORD:-}
+      # Blizzard API client (develop.battle.net) for the Armory update; without it the update only reads public pages
+      - BLIZZARD_CLIENT_ID=${BLIZZARD_CLIENT_ID:-}
+      - BLIZZARD_CLIENT_SECRET=${BLIZZARD_CLIENT_SECRET:-}
       - TZ=Europe/Stockholm
     volumes:
       - ./app:/app:ro

@@ -64,16 +64,23 @@ All three are one-time imports.
 ### Update from the Armory
 
 The Guild members page has an **Update from the Armory** button that anyone can press, at most once an hour (the server
-keeps the time of the last update in the database and refuses earlier presses). `ArmorySync.cs` then reads the public Armory
-page of every character on the site and updates its level, class, race and profession skill levels. It lists what changed,
-and who is no longer in the guild according to the Armory.
+keeps the time of the last update in the database and refuses earlier presses). `ArmorySync.cs` then updates the site and lists what changed.
 
-It does not add or remove members: the Armory has no public list of guild members that a server can read. A new member is
-added on the admin page (the name is enough); the next update fills in the rest once the character is level 10 and has an
-Armory page. Members who have left are removed on the admin page.
+With a Blizzard API client it uses the official API (OAuth2 client credentials, namespace `profile-forever-eu`):
 
-Who can make a recipe: for a trainer recipe (or one without a listed source, such as the starting recipes), everyone with the
-profession and enough skill. For a recipe from a drop, vendor or quest, only the characters the admin has ticked.
+- the guild's member list: new members are added, members who have left are removed (with their professions and recipes);
+- each character's level, class and race;
+- each character's profession skill levels and the recipes it knows (characters below level 10 have no profile).
+
+Create the client at https://develop.battle.net (API Access) and give the site its id and secret as the environment
+variables `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` (on the NAS: in the `.env` file). They are never stored in the repository.
+
+Without a client it reads the public Armory page of every character already on the site (level, class, race, skill levels)
+and cannot add or remove members.
+
+Who can make a recipe: once an update with the API has run, exactly the characters who know the recipe. Before that (or
+without a client): for a trainer recipe, everyone with the profession and enough skill; for a recipe from a drop, vendor or
+quest, only the characters the admin has ticked.
 
 ## Settings
 

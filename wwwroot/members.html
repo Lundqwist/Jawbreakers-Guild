@@ -98,7 +98,11 @@
 
     function showArmoryResult(r) {
       const lines = [];
-      if (r.changes.length === 0) lines.push(el('p', { text: `Checked ${r.checked} characters: nothing has changed.` }));
+      if (r.error) lines.push(el('p', { class: 'msg error', text: r.error }));
+      else if (r.joined?.length) lines.push(el('p', { text: `New in the guild: ${r.joined.join(', ')}.` }));
+      if (r.removed?.length) lines.push(el('p', { text: `Left the guild and removed: ${r.removed.join(', ')}.` }));
+      if (r.error) { /* nothing more to tell */ }
+      else if (r.changes.length === 0) lines.push(el('p', { text: `Checked ${r.checked} characters: nothing has changed.` }));
       else lines.push(el('p', { text: `Checked ${r.checked} characters, ${r.changes.length} changed:` }), el('ul', {}, r.changes.map(t => el('li', { text: t }))));
       if (r.leftGuild.length) lines.push(el('p', { text: `No longer in the guild according to the Armory: ${r.leftGuild.join(', ')}. An admin can remove them.` }));
       if (r.noPage.length) lines.push(el('p', { class: 'muted', text: `No Armory page (below level 10): ${r.noPage.join(', ')}.` }));

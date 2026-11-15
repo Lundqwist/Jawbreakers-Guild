@@ -279,6 +279,8 @@ api.MapPost("/armory/update", async (GuildDb db, ArmorySync armory) =>
 
 api.MapGet("/crafting", async (GuildDb db) => new
 {
+    // True once Blizzard's API has told which recipes each character knows: then nothing is guessed from skill levels
+    exact = await db.Texts.AnyAsync(t => t.Key == "armory-exact"),
     skills = await db.CharacterProfessions.Select(p => new { p.CharacterId, p.Profession, p.Skill }).ToListAsync(),
     known = await db.KnownRecipes.Select(k => new { k.CharacterId, k.Profession, k.SpellId }).ToListAsync()
 });
