@@ -100,12 +100,11 @@
       byClass = new Map(meta.classes.map(cls => [cls, characters.filter(c => c.class === cls)]));
       document.getElementById('classes').replaceChildren(...meta.classes.map(cls => {
         const mine = byClass.get(cls);
-        return el('button', { class: 'class-tile', type: 'button', style: `--class:${CLASS_COLORS[cls] || 'var(--gold)'}`, 'aria-haspopup': 'dialog', onclick: () => showClass(cls) },
+        return el('button', { class: 'class-tile', type: 'button', 'aria-haspopup': 'dialog', onclick: () => showClass(cls),
+            'aria-label': `${cls}: ${mine.length === 1 ? '1 character' : mine.length + ' characters'}` },
+          el('span', { class: mine.length ? 'count' : 'count none', text: String(mine.length) }),
           el('img', { src: classIcon(cls), alt: '', width: 56, height: 56 }),
-          el('span', { class: 'label' },
-            el('span', { class: 'name', text: cls }),
-            el('span', { class: 'count', text: mine.length === 0 ? 'No characters yet' : mine.length === 1 ? '1 character' : `${mine.length} characters` }),
-            mine.length > 0 && el('span', { class: 'levels', text: `Highest level ${Math.max(...mine.map(c => c.level))}` })));
+          el('span', { class: 'name', text: cls }));
       }));
       if (openClass) showClass(openClass); // keep the open window in step after an update
     }
