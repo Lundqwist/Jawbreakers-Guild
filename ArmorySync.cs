@@ -17,7 +17,7 @@ public record ArmoryResult(int Checked, List<string> Changes, List<string> NoPag
 }
 
 /// <summary>
-/// Updates the site from the Armory, at most once an hour.
+/// Updates the site from the Armory, at most once every ten minutes (Cooldown).
 ///
 /// With a Blizzard API client (BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET, from develop.battle.net) it reads the
 /// official API: the guild's member list (new members are added, those who left are removed), each character's level,
@@ -29,7 +29,7 @@ public record ArmoryResult(int Checked, List<string> Changes, List<string> NoPag
 public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<ArmorySync> log)
 {
     public const string CharacterPrefix = "https://worldofwarcraft.blizzard.com/en-gb/forever/eu/armory/character/";
-    public static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(60);
+    public static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(10);
     const string Marker = "var characterProfileInitialState = ";
     const string Api = "https://eu.api.blizzard.com";
     const string ProfileNamespace = "namespace=profile-forever-eu&locale=en_GB";
@@ -84,7 +84,7 @@ public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<
         await db.SaveChangesAsync();
     }
 
-    /// <summary>Runs the update, or returns null when the last one started less than an hour ago (or one is running).</summary>
+    /// <summary>Runs the update, or returns null when the last one started less than ten minutes ago (or one is running).</summary>
     public async Task<ArmoryResult?> Run(GuildDb db)
     {
         if (!await OneAtATime.WaitAsync(0)) return null;
@@ -105,7 +105,7 @@ public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<
                 result = new ArmoryResult(0, [], [], [], []) { Error = "The Armory could not be read. Try again in a little while." };
             }
 
-            // Nothing could be read at all (the Armory is down?): don't make people wait an hour to try again.
+            // Nothing could be read at all (the Armory is down?): don't make people wait to try again.
             if (result.Error is not null || (result.Failed.Count > 0 && result.Failed.Count + result.NoPage.Count == result.Checked))
                 await SetText(db, "armory-update", "");
             await SetText(db, "armory-result", JsonSerializer.Serialize(result, Web));
@@ -306,7 +306,7 @@ public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<
     static readonly System.Collections.Concurrent.ConcurrentDictionary<int, (DateTime At, object Sheet)> Sheets = new();
 
     /// <summary>
-    /// The character's picture, gear and stats from Blizzard's API, kept for an hour.
+    /// The character's picture, gear and stats from Blizzard's API, kept for ten minutes (Cooldown).
     /// Null when there is no API client, or the character has no profile (below level 10).
     /// </summary>
     public async Task<object?> CharacterSheet(Character c)

@@ -265,7 +265,8 @@ api.MapGet("/characters/{id:int}/sheet", async (int id, GuildDb db, ArmorySync a
     return sheet is null ? Results.NotFound() : Results.Ok(sheet);
 });
 
-// ---- Update from the Armory ----// Anyone can start it from the Guild members page, but only once an hour (see ArmorySync.cs).
+// ---- Update from the Armory ----
+// Anyone can start it from the Guild members page, but only once every ten minutes (see ArmorySync.cs).
 
 api.MapGet("/armory", async (GuildDb db) =>
 {
@@ -278,7 +279,7 @@ api.MapPost("/armory/update", async (GuildDb db, ArmorySync armory) =>
     var result = await armory.Run(db);
     var last = await ArmorySync.LastStarted(db);
     return result is null
-        ? Results.Json(new { error = "The members were updated less than an hour ago.", secondsLeft = ArmorySync.SecondsLeft(last) }, statusCode: 429)
+        ? Results.Json(new { error = "The members were updated less than ten minutes ago.", secondsLeft = ArmorySync.SecondsLeft(last) }, statusCode: 429)
         : Results.Ok(new { lastUpdate = last, secondsLeft = ArmorySync.SecondsLeft(last), result });
 });
 

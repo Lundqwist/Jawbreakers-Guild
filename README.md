@@ -10,7 +10,7 @@ The website of Jawbreakers, a Horde guild on the EU PvP ruleset of World of Warc
 
 | Page | What it shows |
 |---|---|
-| **Guild members** | A button per class with the number of characters. A class opens a window with its characters; a character opens its own window with its picture, gear (Wowhead tooltips), stats and professions, read from Blizzard's API when it is opened and kept for an hour. The **Update from the Armory** button refreshes everyone (at most once an hour) |
+| **Guild members** | A button per class with the number of characters. A class opens a window with its characters; a character opens its own window with its picture, gear (Wowhead tooltips), stats and professions, read from Blizzard's API when it is opened and kept for ten minutes. The **Update from the Armory** button refreshes everyone (at most once every ten minutes) |
 | **Events** | Upcoming and past guild events: date, time (realm time), starting point in game, description and requirements |
 | **Crafting** | Every profession with the characters that have it and their skill level, a button to its leveling guide on [wow-professions.com](https://www.wow-professions.com/forever), and its recipes with materials, Wowhead tooltips and the characters who can make each one |
 | **About** | A text about the guild and a history line of what it has achieved |
@@ -63,7 +63,7 @@ All three are one-time imports.
 
 ### Update from the Armory
 
-The Guild members page has an **Update from the Armory** button that anyone can press, at most once an hour (the server
+The Guild members page has an **Update from the Armory** button that anyone can press, at most once every ten minutes (the server
 keeps the time of the last update in the database and refuses earlier presses). `ArmorySync.cs` then updates the site and lists what changed.
 
 With a Blizzard API client it uses the official API (OAuth2 client credentials, namespace `profile-forever-eu`):

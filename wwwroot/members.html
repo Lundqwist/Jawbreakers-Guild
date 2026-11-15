@@ -179,7 +179,7 @@
     }
     loadMembers().catch(err => { document.getElementById('error').textContent = err.message; });
 
-    // ---- Update from the Armory: anyone can press it, the server allows it once an hour ----
+    // ---- Update from the Armory: anyone can press it, the server allows it once every ten minutes ----
     const armoryBtn = document.getElementById('armory-btn'), armoryStatus = document.getElementById('armory-status');
     let armoryReadyAt = 0, armoryLast = null, armoryBusy = false;
 
