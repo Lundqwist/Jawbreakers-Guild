@@ -28,6 +28,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
 });
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<ArmorySync>();
 
 var app = builder.Build();
 
@@ -254,6 +255,24 @@ admin.MapDelete("/characters/{id:int}", async (int id, GuildDb db) =>
     await db.CharacterProfessions.Where(p => p.CharacterId == id).ExecuteDeleteAsync();
     await db.KnownRecipes.Where(k => k.CharacterId == id).ExecuteDeleteAsync();
     return Results.NoContent();
+});
+
+// ---- Update from the Armory ----
+// Anyone can start it from the Guild members page, but only once an hour (see ArmorySync.cs).
+
+api.MapGet("/armory", async (GuildDb db) =>
+{
+    var last = await ArmorySync.LastStarted(db);
+    return new { lastUpdate = last, secondsLeft = ArmorySync.SecondsLeft(last), result = await ArmorySync.LastResult(db) };
+});
+
+api.MapPost("/armory/update", async (GuildDb db, ArmorySync armory) =>
+{
+    var result = await armory.Run(db);
+    var last = await ArmorySync.LastStarted(db);
+    return result is null
+        ? Results.Json(new { error = "The members were updated less than an hour ago.", secondsLeft = ArmorySync.SecondsLeft(last) }, statusCode: 429)
+        : Results.Ok(new { lastUpdate = last, secondsLeft = ArmorySync.SecondsLeft(last), result });
 });
 
 // ---- Crafting ----

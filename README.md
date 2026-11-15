@@ -59,7 +59,18 @@ The database is created in `data/` on first start.
   and material to Wowhead, whose `power.js` script shows the tooltips. The category (armor slot, weapon type, potion, enchant
   slot and so on) comes from the made item's type on Wowhead, or for enchants from the recipe name.
 
-All three are one-time imports: after that the admin keeps the members and skill levels up to date by hand.
+All three are one-time imports.
+
+### Update from the Armory
+
+The Guild members page has an **Update from the Armory** button that anyone can press, at most once an hour (the server
+keeps the time of the last update in the database and refuses earlier presses). `ArmorySync.cs` then reads the public Armory
+page of every character on the site and updates its level, class, race and profession skill levels. It lists what changed,
+and who is no longer in the guild according to the Armory.
+
+It does not add or remove members: the Armory has no public list of guild members that a server can read. A new member is
+added on the admin page (the name is enough); the next update fills in the rest once the character is level 10 and has an
+Armory page. Members who have left are removed on the admin page.
 
 Who can make a recipe: for a trainer recipe (or one without a listed source, such as the starting recipes), everyone with the
 profession and enough skill. For a recipe from a drop, vendor or quest, only the characters the admin has ticked.

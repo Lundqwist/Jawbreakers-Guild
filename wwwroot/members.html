@@ -10,6 +10,11 @@
   <main>
     <h1>Guild members</h1>
     <p class="lead">Pick a character to read more about it.</p>
+    <div class="armory-bar">
+      <button class="btn" id="armory-btn" type="button" disabled>Update from the Armory</button>
+      <span class="muted small" id="armory-status" role="status"></span>
+    </div>
+    <div id="armory-result" class="panel armory-result" hidden></div>
     <div id="classes" class="class-grid"></div>
     <p id="error" class="msg error"></p>
   </main>
@@ -57,17 +62,71 @@
         panel);
     }
 
-    Promise.all([metaPromise, api('characters'), api('crafting')]).then(([meta, characters, crafting]) => {
+    async function loadMembers() {
+      const [meta, characters, crafting] = await Promise.all([metaPromise, api('characters'), api('crafting')]);
       isAdmin = meta.admin;
       skills = crafting.skills;
-      const grid = document.getElementById('classes');
-      for (const cls of meta.classes) {
+      document.getElementById('classes').replaceChildren(...meta.classes.map(cls => {
         const mine = characters.filter(c => c.class === cls);
-        grid.append(el('section', { class: 'panel class-list', style: `--class:${CLASS_COLORS[cls] || 'var(--gold)'}` },
+        return el('section', { class: 'panel class-list', style: `--class:${CLASS_COLORS[cls] || 'var(--gold)'}` },
           el('header', {}, el('h2', { text: cls }), el('span', { class: 'muted', text: String(mine.length) })),
-          mine.length ? el('ul', {}, mine.map(characterItem)) : el('p', { class: 'empty', text: 'No characters yet.' })));
+          mine.length ? el('ul', {}, mine.map(characterItem)) : el('p', { class: 'empty', text: 'No characters yet.' }));
+      }));
+    }
+    loadMembers().catch(err => { document.getElementById('error').textContent = err.message; });
+
+    // ---- Update from the Armory: anyone can press it, the server allows it once an hour ----
+    const armoryBtn = document.getElementById('armory-btn'), armoryStatus = document.getElementById('armory-status');
+    let armoryReadyAt = 0, armoryLast = null, armoryBusy = false;
+
+    function showArmoryState(state) {
+      armoryLast = state.lastUpdate ? new Date(state.lastUpdate) : null;
+      armoryReadyAt = Date.now() + state.secondsLeft * 1000; // counted from now, so a wrong clock on this device doesn't matter
+      tickArmory();
+    }
+
+    function tickArmory() {
+      if (armoryBusy) return;
+      const minutes = Math.ceil((armoryReadyAt - Date.now()) / 60000);
+      armoryBtn.disabled = minutes > 0;
+      const last = armoryLast
+        ? `Last updated ${armoryLast.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`
+        : 'Not updated yet.';
+      armoryStatus.textContent = minutes > 0 ? `${last} Can be updated again in ${minutes} min.` : last;
+    }
+    setInterval(tickArmory, 15000);
+
+    function showArmoryResult(r) {
+      const lines = [];
+      if (r.changes.length === 0) lines.push(el('p', { text: `Checked ${r.checked} characters: nothing has changed.` }));
+      else lines.push(el('p', { text: `Checked ${r.checked} characters, ${r.changes.length} changed:` }), el('ul', {}, r.changes.map(t => el('li', { text: t }))));
+      if (r.leftGuild.length) lines.push(el('p', { text: `No longer in the guild according to the Armory: ${r.leftGuild.join(', ')}. An admin can remove them.` }));
+      if (r.noPage.length) lines.push(el('p', { class: 'muted', text: `No Armory page (below level 10): ${r.noPage.join(', ')}.` }));
+      if (r.failed.length) lines.push(el('p', { class: 'msg error', text: `Could not be read this time: ${r.failed.join(', ')}.` }));
+      const box = document.getElementById('armory-result');
+      box.replaceChildren(...lines);
+      box.hidden = false;
+    }
+
+    armoryBtn.addEventListener('click', async () => {
+      armoryBusy = true;
+      armoryBtn.disabled = true;
+      armoryStatus.textContent = 'Reading the Armory, this takes a little while…';
+      try {
+        const state = await api('armory/update', 'POST');
+        showArmoryResult(state.result);
+        await loadMembers();
+        armoryBusy = false;
+        showArmoryState(state);
+      } catch (err) {
+        armoryBusy = false;
+        // Most likely someone else updated in the meantime: show when it can be done again
+        await api('armory').then(showArmoryState).catch(() => {});
+        armoryStatus.textContent = `${err.message} ${armoryStatus.textContent}`;
       }
-    }).catch(err => { document.getElementById('error').textContent = err.message; });
+    });
+
+    api('armory').then(showArmoryState).catch(() => { armoryStatus.textContent = ''; });
   </script>
 </body>
 </html>
