@@ -28,6 +28,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
 });
 builder.Services.AddAuthorization();
+builder.Services.AddHttpClient(ArmorySync.HttpClientName, http =>
+{
+    http.Timeout = TimeSpan.FromSeconds(20);
+    http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; JawbreakersGuildSite/1.0)");
+});
 builder.Services.AddSingleton<ArmorySync>();
 
 var app = builder.Build();
@@ -392,3 +397,6 @@ admin.MapDelete("/milestones/{id:int}", async (int id, GuildDb db) =>
 });
 
 app.Run();
+
+// Lets the tests (tests/Jawbreakers.Tests) start the site in memory with WebApplicationFactory<Program>.
+public partial class Program;

@@ -1,5 +1,7 @@
 # Jawbreakers Guild
 
+[![CI](https://github.com/Lundqwist/Jawbreakers-Guild/actions/workflows/ci.yml/badge.svg)](https://github.com/Lundqwist/Jawbreakers-Guild/actions/workflows/ci.yml)
+
 The website of Jawbreakers, a Horde guild on the EU PvP ruleset of World of Warcraft: Forever.
 
 **Live:** https://lundqwist.se/jawbreakers/
@@ -25,6 +27,7 @@ There is one admin, who signs in with a password. Visitors don't sign in.
 - Plain HTML, CSS and JavaScript in `wwwroot`: no framework and no build step
 - Cookie sign-in for the admin; the password comes from an environment variable, never from a file in the repository
 - Docker on a Synology NAS, behind the lundqwist.se site ([Lundqwist/Website2.0](https://github.com/Lundqwist/Website2.0)), which passes `/jawbreakers/...` on to this one
+- xUnit integration tests with `WebApplicationFactory`, run by GitHub Actions on every push
 
 ## Architecture
 
@@ -151,11 +154,29 @@ API calls without it get 401 instead of a redirect to a login page.
 
 ### What I would change next
 
-- Tests for `ArmorySync` and the input checks. The update's decisions (who joined, who left, which spell ids a recipe
-  name matches) are pure enough to test without Blizzard once the HTTP calls are behind an interface.
 - EF Core migrations instead of `EnsureCreated` and hand-written `CREATE TABLE`.
 - `ArmorySync` does both fetching and applying in one 500-line class. Splitting it into an API reader, a page reader and
-  the code that applies a list of `Sheet`s would make each part easier to test.
+  the code that applies a list of `Sheet`s would make each part easier to test on its own.
+- Tests for the Crafting page's JavaScript, which decides who can make a recipe when the API hasn't said.
+
+## Tests
+
+```
+dotnet test Jawbreakers.sln
+```
+
+`tests/Jawbreakers.Tests` starts the whole site in memory with `WebApplicationFactory`, each test with its own empty
+SQLite database in a temporary folder, and talks to it over HTTP like the pages do. Nothing reaches the network:
+the site's `armory` HttpClient gets a fake Blizzard (`FakeBlizzard`) that answers the OAuth token, guild roster,
+profession and Armory page requests with canned JSON and HTML.
+
+| File | What it checks |
+|---|---|
+| `ArmorySyncTests.cs` | The Armory update: new members are added and those who left are removed; known recipe names become the Crafting page's spell ids; an empty guild list or a refused API client changes nothing and doesn't start the ten-minute wait; a second press within ten minutes gets 429; without an API client it reads the public pages and never removes anyone |
+| `AdminApiTests.cs` | Changes need the admin's cookie; wrong password, signing out; every check on characters, professions and events, and that a refused character isn't half-saved; only characters with a profession can be ticked for its recipes |
+
+GitHub Actions (`.github/workflows/ci.yml`) builds the solution and runs the tests on every push and pull request,
+and keeps the results as a `.trx` file.
 
 ## Folders
 
@@ -167,6 +188,8 @@ API calls without it get 401 instead of a redirect to a login page.
 | `seed/` | The first members and their profession skill levels, imported into an empty database |
 | `wwwroot/` | The pages, `css/site.css`, `js/common.js` (header, footer, helpers) and `recipes/` |
 | `deploy/`, `deploy.ps1` | Docker compose file and the script that publishes to the NAS |
+| `tests/Jawbreakers.Tests/` | The xUnit tests (see Tests) |
+| `.github/workflows/ci.yml` | Build and test on GitHub Actions |
 
 ## Run locally
 

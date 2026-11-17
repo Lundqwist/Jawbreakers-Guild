@@ -26,28 +26,25 @@ public record ArmoryResult(int Checked, List<string> Changes, List<string> NoPag
 /// Without one it reads the public Armory page of each character already on the site (level, class, race, skill
 /// levels) and cannot add or remove members.
 /// </summary>
-public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<ArmorySync> log)
+public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<ArmorySync> log, IHttpClientFactory httpFactory)
 {
     public const string CharacterPrefix = "https://worldofwarcraft.blizzard.com/en-gb/forever/eu/armory/character/";
     public static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(10);
+    /// <summary>The name of the HttpClient registered in Program.cs (tests swap its handler for a fake Blizzard).</summary>
+    public const string HttpClientName = "armory";
     const string Marker = "var characterProfileInitialState = ";
     const string Api = "https://eu.api.blizzard.com";
     const string ProfileNamespace = "namespace=profile-forever-eu&locale=en_GB";
     const string StaticNamespace = "namespace=static-forever-eu&locale=en_GB";
 
-    static readonly HttpClient Http = CreateClient();
-    static readonly SemaphoreSlim OneAtATime = new(1, 1);
     static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+
+    // ArmorySync is a singleton, so these are shared by every request
+    readonly SemaphoreSlim OneAtATime = new(1, 1);
+    HttpClient Http => httpFactory.CreateClient(HttpClientName);
 
     string? _token;
     DateTime _tokenExpires;
-
-    static HttpClient CreateClient()
-    {
-        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; JawbreakersGuildSite/1.0)");
-        return http;
-    }
 
     /// <summary>One character as the Armory has it. Professions is null when they could not be read.</summary>
     record Sheet(string Name, string Slug, int Level, string Class, string Race, string GuildSlug,
@@ -303,7 +300,7 @@ public class ArmorySync(IConfiguration config, IWebHostEnvironment env, ILogger<
 
     // ---- One character's sheet (picture, gear, stats), for the character window on the Guild members page ----
 
-    static readonly System.Collections.Concurrent.ConcurrentDictionary<int, (DateTime At, object Sheet)> Sheets = new();
+    readonly System.Collections.Concurrent.ConcurrentDictionary<int, (DateTime At, object Sheet)> Sheets = new();
 
     /// <summary>
     /// The character's picture, gear and stats from Blizzard's API, kept for ten minutes (Cooldown).
