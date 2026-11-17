@@ -80,6 +80,8 @@ function eventCard(ev) {
   ];
   document.body.prepend(el('header', { class: 'site-header' },
     el('div', { class: 'inner' },
+      el('a', { class: 'home-logo', href: 'https://lundqwist.se', title: 'Back to lundqwist.se' },
+        el('img', { src: 'images/lundqwist-logo.webp', alt: 'lundqwist.se', width: 36, height: 36 })),
       el('a', { class: 'brand', href: './' }, 'Jaw', el('span', { text: 'breakers' })),
       el('nav', { class: 'nav', 'aria-label': 'Main' },
         links.map(([href, text]) => el('a', {

@@ -65,6 +65,9 @@ a:hover { color: var(--ember); }
   flex-wrap: wrap;
   gap: .5rem 1.5rem;
 }
+.home-logo { display: flex; margin-right: -.6rem; padding-right: .9rem; border-right: 1px solid var(--line); }
+.home-logo img { display: block; width: 36px; height: 36px; transition: filter .15s; }
+.home-logo:hover img { filter: drop-shadow(0 0 6px var(--gold)); }
 .brand { font-size: 1.3rem; font-weight: 700; color: var(--text); text-decoration: none; }
 .brand span { color: var(--ember); }
 .nav { display: flex; flex-wrap: wrap; gap: .25rem; margin-left: auto; }
