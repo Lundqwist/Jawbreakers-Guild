@@ -26,6 +26,137 @@ There is one admin, who signs in with a password. Visitors don't sign in.
 - Cookie sign-in for the admin; the password comes from an environment variable, never from a file in the repository
 - Docker on a Synology NAS, behind the lundqwist.se site ([Lundqwist/Website2.0](https://github.com/Lundqwist/Website2.0)), which passes `/jawbreakers/...` on to this one
 
+## Architecture
+
+```mermaid
+flowchart TB
+    visitor["Browser"]
+
+    subgraph nas["Synology NAS"]
+        proxy["DSM reverse proxy<br/>ends HTTPS"]
+        site["lundqwist.se<br/>ASP.NET Core + YARP"]
+        subgraph container["Container jawbreakers · 127.0.0.1:8095"]
+            app["Minimal API<br/>Program.cs"]
+            sync["ArmorySync"]
+            static["wwwroot<br/>pages, recipes/*.json"]
+        end
+        db[("SQLite<br/>/data")]
+    end
+
+    subgraph blizzard["Blizzard"]
+        oauth["oauth.battle.net"]
+        bapi["eu.api.blizzard.com<br/>profile-forever-eu"]
+        armory["Armory web pages"]
+    end
+
+    wowhead["Wowhead power.js<br/>tooltips"]
+
+    visitor -- "https://lundqwist.se/jawbreakers/" --> proxy --> site -- "/jawbreakers/* over http" --> app
+    app --> static
+    app <--> db
+    app --> sync
+    sync -- "client credentials" --> oauth
+    sync -- "roster, professions, gear" --> bapi
+    sync -. "fallback without an API client" .-> armory
+    visitor -. "tooltips, loaded in the page" .-> wowhead
+```
+
+A visitor's request goes through the NAS's reverse proxy (which ends HTTPS) and the lundqwist.se site, which passes everything
+under `/jawbreakers/` on to this app with YARP. The app only listens on `127.0.0.1`, so it can't be reached any other way.
+It serves the static pages and recipe lists itself and answers `/api/...` from SQLite. Blizzard is only called when someone
+presses **Update from the Armory** or opens a character window:
+
+```mermaid
+sequenceDiagram
+    actor V as Visitor
+    participant A as API
+    participant S as ArmorySync
+    participant D as SQLite
+    participant B as Blizzard API
+
+    V->>A: POST /api/armory/update
+    A->>S: Run()
+    S->>D: last update < 10 min ago?
+    alt too soon, or an update is already running
+        S-->>A: null
+        A-->>V: 429 + seconds left
+    else
+        S->>D: store the start time
+        S->>B: token, guild roster, class and race names
+        par four characters at a time
+            S->>B: professions and known recipes
+        end
+        S->>D: add new members, remove those who left, update levels, skills, recipes
+        S->>D: store the result
+        A-->>V: 200 + what changed
+    end
+```
+
+### Design decisions
+
+**One small app instead of layers.** All endpoints are in `Program.cs` as a minimal API, the tables in `Data.cs`, and
+the only real logic, the Armory update, has its own class. About 20 endpoints and one admin don't need controllers,
+repositories and a service layer. Each kind of input is checked in one `Apply...` function that returns an error text or
+null, used by both create and update. If the site grows, the endpoint groups (`/api/characters`, `/api/events`, ...)
+are the natural seams to split it along.
+
+**SQLite, in a folder that deploys never touch.** The data is small, and only one person (the admin) and the update
+write to it. SQLite needs no database server, and a backup is a copy of one file. The database and the cookie
+encryption keys both live in `DataDir`, mounted as its own volume, so a deploy can replace the whole app folder and a
+restart doesn't sign the admin out. The cost: the schema is made with `EnsureCreated`, which can't change an existing
+database, so the two tables added later are created with `CREATE TABLE IF NOT EXISTS`. The next schema change should move
+to EF Core migrations.
+
+**Reference data as static files, changing data in the database.** The 2,215 recipes never change, so they are JSON files in
+`wwwroot/recipes/` that the browser downloads and caches, not tables. The database only holds what changes: who is in the
+guild, their skills and which recipes they know, linked to the files by Wowhead's spell id. The Crafting page puts the
+two together in the browser.
+
+**No frontend framework and no build step.** The pages are plain HTML and JavaScript, so there is nothing to compile and
+nothing to keep up to date. `common.js` has a small `el()` helper that always puts text in as text, never as HTML, so
+names and descriptions typed in the admin page can't inject script. Every address is relative (`api/...`, not `/api/...`),
+so the same files work at the root locally and under `/jawbreakers/` live.
+
+**Built to run under someone else's address.** The app gets its path from the `PathBase` setting and answers 404 outside
+it. Because the proxies hand the request over as plain http, it reads `X-Forwarded-Proto` so ASP.NET Core knows the
+visitor used https, and the admin cookie is always marked `Secure` in production.
+
+**No image to build.** The container runs Microsoft's own `aspnet:8.0` image with the published app mounted read-only.
+A deploy is "publish, copy, restart": no Dockerfile, no registry, and nothing on the NAS but the files.
+
+**The Armory update runs when someone asks for it, not on a timer.** A background job would call Blizzard all day for a
+guild that looks at the site a few times a week. Instead anyone can press the button, at most once every ten minutes.
+The time of the last update is stored in the database, so a restart doesn't reset it, and a `SemaphoreSlim` stops two
+presses from running at once. The update is careful with what it trusts:
+
+- it reads everything first and writes to the database at the end, so a failed read leaves the site as it was;
+- an empty guild list counts as a failure, since applying it would remove every member;
+- when nothing at all could be read, the ten-minute wait is cancelled so people can try again;
+- it asks for at most four characters at a time and keeps the OAuth token until five minutes before it runs out.
+
+**Two ways to read the Armory.** With a Blizzard API client the update uses the official API and can add and remove members
+and read known recipes. Without one it reads the JSON embedded in each character's public Armory page, which gives less
+but means the site works without keys (for example when someone clones the repository). Both return the same `Sheet`
+record, so the code that changes the database is shared.
+
+**Character windows are cached, not stored.** Gear and stats are only needed while a window is open, so they are read from
+Blizzard on demand and kept in memory for ten minutes. An update clears that cache. Losing it on a restart costs one extra
+API call.
+
+**One admin, one password, no user accounts.** Visitors never sign in, so the only account is the admin's. The password
+comes from an environment variable; without it, sign-in is off in production (a development run makes a temporary one).
+Both the given and the real password are hashed with SHA-256 before a constant-time comparison, so neither the content nor
+the length leaks through timing, and a wrong password costs 800 ms. The cookie is `HttpOnly` and `SameSite=Strict`, and
+API calls without it get 401 instead of a redirect to a login page.
+
+### What I would change next
+
+- Tests for `ArmorySync` and the input checks. The update's decisions (who joined, who left, which spell ids a recipe
+  name matches) are pure enough to test without Blizzard once the HTTP calls are behind an interface.
+- EF Core migrations instead of `EnsureCreated` and hand-written `CREATE TABLE`.
+- `ArmorySync` does both fetching and applying in one 500-line class. Splitting it into an API reader, a page reader and
+  the code that applies a list of `Sheet`s would make each part easier to test.
+
 ## Folders
 
 | Path | What |
